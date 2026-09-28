@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Layers generated from the iOS AppIcon artwork; see tools/MakeIcon.swift.
+     No <monochrome> on purpose: the artwork reduces to an illegible blob as a
+     single-colour silhouette — the white map fills in solid — and launchers
+     fall back to this full-colour icon in themed mode, which reads far better
+     than a smudge would. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

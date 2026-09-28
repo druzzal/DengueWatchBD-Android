@@ -7,3 +7,22 @@ xcuserdata/
 
 # macOS
 .DS_Store
+
+# Android / Gradle
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+*.aab
+captures/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+
+# Signing. The upload key and its passwords never belong in the repository.
+keystore.properties
+*.jks
+*.keystore

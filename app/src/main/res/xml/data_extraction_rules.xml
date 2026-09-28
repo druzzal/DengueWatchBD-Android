@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nothing this app holds leaves the device.
+
+  The About screen tells the reader: "Your area, your settings and your symptom
+  log stay on this device." Android's Auto Backup would quietly contradict that
+  — with no rules it copies both `dengue_watch_prefs` and `case-log.json` to the
+  user's Google Drive, and the case log is symptom data about a named person's
+  health. Backing that up off-device would also have to be declared on Play's
+  Data Safety form as health data transferred to a third party.
+
+  So both routes off the device are closed: cloud backup, and the Android 12+
+  device-to-device transfer that `allowBackup="false"` alone does not cover.
+  The cost is that settings do not follow a user to a new phone. For a screen
+  of preferences and a personal symptom diary, keeping the promise is worth
+  more than the convenience.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

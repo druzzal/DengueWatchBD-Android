@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Geofencing only. Asked for separately, from the alert settings, and only
+         once the reader has turned the entry warning on — Android grants it in
+         system settings rather than in a dialog, so asking up front would be a
+         detour from a screen that had not yet explained why. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- WorkManager re-registers the periodic refresh and the weekly digest
+         after a restart, which needs this. WorkManager's own manifest declares
+         it too, so it ships either way; keeping it here records that the app
+         depends on that rescheduling rather than getting it by accident. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+
+    <!-- Dialling an emergency number and opening a map are handed to whichever
+         app the user already has. Android 11+ hides other packages unless the
+         intents are declared here. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.DengueWatch">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.DengueWatch">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Geofence transitions. Not exported: only Play Services delivers to
+             it, via a PendingIntent this app created. -->
+        <receiver
+            android:name=".data.GeofenceReceiver"
+            android:exported="false" />
+    </application>
+</manifest>
