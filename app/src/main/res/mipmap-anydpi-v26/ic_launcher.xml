@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Layers generated from the iOS AppIcon artwork; see tools/MakeIcon.swift.
+<!-- Layers cut from the supplied app artwork; see tools/MakeIcon.swift.
+
+     The foreground is the artwork at 67% of the 108dp canvas, which is the size
+     of the 72dp area a launcher keeps. It is not larger on purpose: the artwork
+     is full-bleed, its outer signal arc reaching 1.04 of its own half-width, so
+     anything bigger loses the arcs to the circular mask. The background carries
+     the artwork's colours — white above, the wave's blue across the bottom 17%
+     — so the sliver a launcher reveals while it animates the icon is never a
+     grey box.
+
      No <monochrome> on purpose: the artwork reduces to an illegible blob as a
-     single-colour silhouette — the white map fills in solid — and launchers
-     fall back to this full-colour icon in themed mode, which reads far better
-     than a smudge would. -->
+     single-colour silhouette — the map fills in solid — and launchers fall back
+     to this full-colour icon in themed mode, which reads far better than a
+     smudge would. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@mipmap/ic_launcher_background" />
     <foreground android:drawable="@mipmap/ic_launcher_foreground" />
