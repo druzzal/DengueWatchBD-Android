@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the app's own cache directory is shared, and only the two sub-folders the
+  app itself writes into: the report capture, and the area card the reader asks
+  to share. Nothing in shared storage, and nothing the user did not either
+  photograph or explicitly choose to send, is reachable through this provider.
+-->
+<paths>
+    <cache-path name="report-captures" path="reports/" />
+    <cache-path name="shared-cards" path="shared/" />
+</paths>

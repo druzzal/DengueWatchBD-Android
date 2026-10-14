@@ -67,6 +67,20 @@ data class Area(
     val risk: RiskLevel get() = RiskLevel.forIncidence(incidencePer100k)
 
     fun recentWeeks(count: Int): List<Int> = weeklyCases.takeLast(count)
+
+    /**
+     * The band this area sat in during the week at [index].
+     *
+     * The same two-week window the headline [risk] uses, just anchored on an
+     * earlier week: risk here is always a fortnight's incidence, so a bar drawn
+     * in "high" means the same thing as the badge on the row above it. Ported
+     * from iOS, where the weekly chart has always been coloured this way.
+     */
+    fun riskAtWeek(index: Int): RiskLevel {
+        if (index !in weeklyCases.indices || populationThousands <= 0) return RiskLevel.LOW
+        val window = weeklyCases.subList(maxOf(0, index - 1), index + 1)
+        return RiskLevel.forIncidence(window.sum().toDouble() / populationThousands * 100)
+    }
 }
 
 /**
@@ -263,8 +277,24 @@ data class YearSummary(
 )
 
 /** One age band, split by sex. The feed publishes this for cases and deaths. */
-data class AgeBand(val label: String, val male: Int, val female: Int) {
-    val total: Int get() = male + female
+/**
+ * One row of DGHS's age table.
+ *
+ * [total] is the figure DGHS publishes, not `male + female`. The two are not
+ * the same: the 2026 season table counts 244 cases whose sex was never
+ * recorded, spread across every band. Deriving the total threw those cases
+ * away silently — the bars added up, the card simply described fewer people
+ * than the source does, and nothing in the app could notice.
+ */
+data class AgeBand(
+    val label: String,
+    val male: Int,
+    val female: Int,
+    /** DGHS's published Total for this band. */
+    val total: Int,
+) {
+    /** Cases DGHS counted in this band but recorded no sex for. */
+    val unrecordedSex: Int get() = maxOf(0, total - male - female)
 }
 
 data class SexSplit(val male: Int, val female: Int) {

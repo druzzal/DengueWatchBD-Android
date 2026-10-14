@@ -47,10 +47,27 @@ object FeedConfig {
     const val CACHED_FILENAME = "latest-feed.json"
 
     /**
-     * Don't re-poll more often than this when the app returns to the front.
-     * DGHS publishes once a day, so six hours is already generous.
+     * How long to leave the cheap probe alone when the app returns to the front.
+     *
+     * This gates `summary.json` — about 350 bytes — and nothing else. The
+     * expensive download is already held back by its own gate: the full
+     * document is fetched only when the probe reports a report date newer than
+     * the one on screen. So the cost of checking often is a few hundred bytes,
+     * and the cost of checking rarely is a reader looking at yesterday's
+     * figures.
+     *
+     * This was six hours, which defeated the point of having a cheap probe at
+     * all. DGHS publishes once a day but not at a fixed hour — over two weeks
+     * the report landed anywhere from 11:05 to 17:36 UTC — so a six-hour window
+     * reliably straddled publication. Reproduced on 7 October by planting the
+     * previous day's feed in the cache: the app kept serving it across relaunches
+     * and picked up the new report the moment the window was cleared.
+     *
+     * Fifteen minutes is short enough that a new report is on screen about as
+     * soon as it exists, and long enough that switching apps back and forth does
+     * not talk to the server each time.
      */
-    const val MINIMUM_SYNC_INTERVAL_MILLIS = 6L * 60 * 60 * 1000
+    const val MINIMUM_PROBE_INTERVAL_MILLIS = 15L * 60 * 1000
 
     /**
      * Past this age the app says the figures are behind rather than presenting

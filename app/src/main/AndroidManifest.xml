@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -17,7 +18,14 @@
          depends on that rescheduling rather than getting it by accident. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Photographing a lab report so its values can be read off the page.
+         The image is processed on this device and is never uploaded; nothing
+         is written to shared storage either — the capture goes to the app's
+         own cache and is deleted once it has been read. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- Dialling an emergency number and opening a map are handed to whichever
          app the user already has. Android 11+ hides other packages unless the
@@ -43,6 +51,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|uiMode|keyboard|keyboardHidden|navigation"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.DengueWatch">
             <intent-filter>
@@ -51,10 +60,46 @@
             </intent-filter>
         </activity>
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Geofence transitions. Not exported: only Play Services delivers to
              it, via a PendingIntent this app created. -->
         <receiver
             android:name=".data.GeofenceReceiver"
             android:exported="false" />
+
+        <!--
+            ML Kit's usage reporting, switched off. The bundled text recogniser
+            registers Google's CCT logging backend, which uploads usage events
+            to Firebase logging. This app tells its readers it sends no
+            analytics, so the backend is removed: recognition still runs
+            entirely on the phone, and the events it would have sent have
+            nowhere to go and are discarded.
+        -->
+        <service
+            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+            tools:node="merge">
+            <meta-data
+                android:name="backend:com.google.android.datatransport.cct.CctBackendFactory"
+                tools:node="remove" />
+        </service>
+
+        <!-- Puts the geofences back after a restart, which drops them all. -->
+        <receiver
+            android:name=".data.GeofenceRearmReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

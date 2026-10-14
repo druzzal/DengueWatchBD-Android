@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.denguewatch.bd.i18n.LocalLocalization
 import com.denguewatch.bd.i18n.labelKey
@@ -68,18 +70,51 @@ fun SectionHeader(
     subtitle: String? = null,
     trailing: @Composable () -> Unit = {},
 ) {
-    Row(
+    // Side by side while both fit; otherwise the accessory drops below rather
+    // than squeezing the title onto two lines — what iOS does with
+    // ViewThatFits. "Today in Bangladesh" beside the DGHS badge is exactly wide
+    // enough to need it: side by side it broke as "Today in / Bangladesh".
+    //
+    // The gap allowed beside the title is the hairline, not the usual tight
+    // spacing: on a 384dp phone the pair missed by four pixels at 8dp and
+    // stacked, where the iPhone it was drawn for keeps them on one line.
+    Layout(
         modifier = modifier.fillMaxWidth().semantics { heading() },
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(Space.tight),
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = typo(Typo.SECTION_TITLE))
-            if (subtitle != null) {
-                Text(subtitle, style = typo(Typo.CAPTION), color = Dw.colors.secondaryText)
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = typo(Typo.SECTION_TITLE))
+                if (subtitle != null) {
+                    Text(subtitle, style = typo(Typo.CAPTION), color = Dw.colors.secondaryText)
+                }
+            }
+            Box { trailing() }
+        },
+    ) { (titleBlock, accessory), constraints ->
+        val width = constraints.maxWidth
+        val gap = Space.tight.roundToPx()
+        val besideGap = Space.hair.roundToPx()
+        val accessoryPlaceable = accessory.measure(constraints.copy(minWidth = 0, minHeight = 0))
+        // A header with no accessory must not gain a gap where one would have
+        // gone; most headers in the app are title-only.
+        val hasAccessory = accessoryPlaceable.width > 0
+        val besideWidth = if (hasAccessory) accessoryPlaceable.width + besideGap else 0
+        val fitsBeside = titleBlock.maxIntrinsicWidth(constraints.maxHeight) + besideWidth <= width
+
+        if (fitsBeside || !hasAccessory) {
+            val titlePlaceable = titleBlock.measure(
+                Constraints(maxWidth = (width - besideWidth).coerceAtLeast(0))
+            )
+            layout(width, maxOf(titlePlaceable.height, accessoryPlaceable.height)) {
+                titlePlaceable.place(0, 0)
+                if (hasAccessory) accessoryPlaceable.place(width - accessoryPlaceable.width, 0)
+            }
+        } else {
+            val titlePlaceable = titleBlock.measure(Constraints(maxWidth = width))
+            layout(width, titlePlaceable.height + gap + accessoryPlaceable.height) {
+                titlePlaceable.place(0, 0)
+                accessoryPlaceable.place(0, titlePlaceable.height + gap)
             }
         }
-        trailing()
     }
 }
 
@@ -117,6 +152,36 @@ fun GroupedSection(
             }
             Text(title, style = typo(Typo.SUBHEADLINE), color = Dw.colors.secondaryText)
         }
+        Card {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.row), content = content)
+        }
+        if (footnote != null) {
+            Text(
+                footnote,
+                style = typo(Typo.MICRO),
+                color = Dw.colors.secondaryText,
+                modifier = Modifier.padding(horizontal = Space.card),
+            )
+        }
+    }
+}
+
+/**
+ * The same group of rows with no heading above it.
+ *
+ * iOS forms use headerless sections freely — rows that follow on from the
+ * section before them, where a heading would only repeat the screen's own
+ * title. Separate from [GroupedSection] rather than a nullable title on it, so
+ * a caller cannot accidentally pass an empty string and leave a gap where a
+ * heading used to be.
+ */
+@Composable
+fun PlainSection(
+    modifier: Modifier = Modifier,
+    footnote: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(Space.tight)) {
         Card {
             Column(verticalArrangement = Arrangement.spacedBy(Space.row), content = content)
         }
@@ -205,10 +270,18 @@ fun RiskBadge(
             tint = Dw.colors.riskInk(risk),
             modifier = Modifier.size(if (compact) 12.dp else 14.dp),
         )
-        Text(
+        // A band name is never broken across lines. Inside the fixed badge
+        // gutter of a ranked row, "Moderate" was 2dp wider than the space left
+        // after the icon and padding, so it wrapped to "Moderat" / "e" — a word
+        // split mid-syllable, which reads as a rendering fault rather than as a
+        // risk level. Shrinking is the project's answer to a tight fit; where
+        // the badge sizes to its content, as it does on the home card, there is
+        // room at full size and nothing shrinks.
+        ShrinkToFitText(
             label,
             style = typo(if (compact) Typo.MICRO else Typo.CAPTION),
             color = Dw.colors.riskInk(risk),
+            minScale = 0.8f,
         )
     }
 }
@@ -367,19 +440,23 @@ fun StatCard(
                     if (change != null) TrendIndicator(change)
                     if (caption != null) {
                         // One line, shrunk to fit — the same treatment iOS gives
-                        // it. Bengali overflows only narrowly here ("গত সপ্তাহের
-                        // তুলনায়" wants about 245px in roughly 238px beside the
-                        // trend figure), so a few percent recovers it and the
-                        // card keeps the single-line rhythm of the design.
-                        // Wrapping to a second line fixed the truncation but
-                        // changed the shape of the card, which is not what the
-                        // layout is asking for.
+                        // it, so the card keeps the single-line rhythm of the
+                        // design rather than growing a second line in one
+                        // language and not the other.
+                        //
+                        // The floor has to clear the longest caption in either
+                        // language on the *narrowest* card that uses one, which
+                        // is the half-width pair on the area screen. 0.7 was set
+                        // for "গত সপ্তাহের তুলনায়"; the weekly caption is now
+                        // "আগের ৭ দিনের তুলনায়", which is longer, and at 0.7 it
+                        // clipped to "আগের ৭ দিনের" — a phrase that reads as
+                        // finished rather than as cut.
                         ShrinkToFitText(
                             caption,
                             style = typo(Typo.MICRO),
                             color = Dw.colors.secondaryText,
                             modifier = Modifier.weight(1f),
-                            minScale = 0.7f,
+                            minScale = 0.55f,
                         )
                     }
                 }
@@ -393,10 +470,17 @@ data class LegendItem(val label: String, val color: Color, val isLine: Boolean =
 
 @Composable
 fun ChartLegend(items: List<LegendItem>, modifier: Modifier = Modifier) {
-    Row(
+    // Flows onto a second line rather than squeezing.
+    //
+    // A plain Row divided the width between however many keys there were, and
+    // the weekly area chart needs five — four bands and the average. On a 360dp
+    // handset the last one was given so little room that "3-week average" broke
+    // mid-word into "3-week / averag / e". A legend key is a label, not a
+    // paragraph: it either fits on its line or takes the next one.
+    FlowRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Space.row),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items.forEach { item ->
             Row(

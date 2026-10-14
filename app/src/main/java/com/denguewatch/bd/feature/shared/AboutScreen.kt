@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.denguewatch.bd.AppState
 import com.denguewatch.bd.data.FeedConfig
+import com.denguewatch.bd.data.FeedSync
 import com.denguewatch.bd.i18n.AppLanguage
 import com.denguewatch.bd.i18n.LocalLocalization
 import com.denguewatch.bd.ui.theme.Dw
@@ -65,7 +66,12 @@ fun AboutScreen(
     var checking by remember { mutableStateOf(false) }
 
     LazyColumn(
-        modifier = modifier.fillMaxSize().background(colors.plane),
+        // Every other screen insets its sections by the screen margin; without
+        // it these cards ran to the very edge of the display.
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.plane)
+            .padding(horizontal = Space.screen),
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(Space.stack),
     ) {
@@ -140,9 +146,18 @@ fun AboutScreen(
         item {
             GroupedSection(loc.t("about.sync")) {
                 InlineNote(
-                    detail = state.sync.lastSuccessfulSync
-                        ?.let { loc.t("sync.lastChecked", loc.relative(it)) }
-                        ?: loc.t("sync.bundled"),
+                    // What the last check actually did. This only ever showed
+                    // the last success, so "Check for updates now" with no
+                    // connection changed nothing on screen: the reader could
+                    // not tell a failed check from one that never ran.
+                    detail = when (state.sync.status) {
+                        is FeedSync.Status.Syncing -> loc.t("sync.updating")
+                        is FeedSync.Status.Offline -> loc.t("sync.offline")
+                        is FeedSync.Status.Failed -> loc.t("sync.failed")
+                        else -> state.sync.lastSuccessfulSync
+                            ?.let { loc.t("sync.lastChecked", loc.relative(it)) }
+                            ?: loc.t("sync.bundled")
+                    },
                 )
                 HairlineDivider()
                 // The refresh the whole screen is about: everything above states

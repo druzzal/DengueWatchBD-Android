@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import com.denguewatch.bd.model.RiskLevel
+import com.denguewatch.bd.model.TemperatureUnit
 import kotlin.reflect.KProperty
 
 /**
@@ -34,6 +35,14 @@ class Preferences(context: Context) {
 
     var alertsEnabled: Boolean by persistedBoolean("alertsEnabled", false)
 
+    /**
+     * Which end of My log the reader starts from.
+     *
+     * Kept because it is a reading preference, not screen state: someone
+     * who reads their record oldest-first means it every time they open it.
+     */
+    var logOldestFirst: Boolean by persistedBoolean("log.oldestFirst", false)
+
     /** Raise a local alert once the home area reaches this band. */
     var alertThreshold: RiskLevel by persistedEnum("alertThresholdRawValue", RiskLevel.HIGH)
 
@@ -43,6 +52,18 @@ class Preferences(context: Context) {
 
     /** Warn the user when they physically enter a high-risk area. */
     var geofenceAlertsEnabled: Boolean by persistedBoolean("geofenceAlertsEnabled", false)
+
+    /**
+     * Which unit temperatures are typed and shown in.
+     *
+     * Celsius by default: Bangladesh reports fever in Celsius, and a household
+     * thermometer there is marked in it. Readings are stored in Celsius
+     * whatever this says, so changing it re-labels the record rather than
+     * rewriting it.
+     */
+    var temperatureUnit: TemperatureUnit by persistedTemperatureUnit(
+        "temperatureUnitRawValue", TemperatureUnit.CELSIUS
+    )
 
     // MARK: - Write-through, observable delegates
 
@@ -72,6 +93,13 @@ class Preferences(context: Context) {
     private fun persistedBoolean(key: String, default: Boolean) =
         Persisted(defaults.getBoolean(key, default)) { value ->
             defaults.edit().putBoolean(key, value).apply()
+        }
+
+    private fun persistedTemperatureUnit(key: String, default: TemperatureUnit) =
+        Persisted(
+            TemperatureUnit.entries.getOrNull(defaults.getInt(key, default.ordinal)) ?: default
+        ) { value ->
+            defaults.edit().putInt(key, value.ordinal).apply()
         }
 
     private fun persistedEnum(key: String, default: RiskLevel) =

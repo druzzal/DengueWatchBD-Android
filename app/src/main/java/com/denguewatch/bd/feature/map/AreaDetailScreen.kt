@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,11 +32,13 @@ import com.denguewatch.bd.feature.shared.SecondaryActionButton
 import com.denguewatch.bd.feature.shared.StatCard
 import com.denguewatch.bd.feature.shared.axisTicks
 import com.denguewatch.bd.feature.shared.pickLabels
+import com.denguewatch.bd.feature.shared.weekLabels
 import com.denguewatch.bd.i18n.LocalLocalization
 import com.denguewatch.bd.i18n.displayName
 import com.denguewatch.bd.i18n.guidanceKey
 import com.denguewatch.bd.i18n.labelKey
 import com.denguewatch.bd.model.Area
+import com.denguewatch.bd.model.RiskLevel
 import com.denguewatch.bd.model.Series
 import com.denguewatch.bd.ui.theme.Card
 import com.denguewatch.bd.ui.theme.Dw
@@ -80,7 +83,7 @@ fun AreaDetailScreen(
         verticalArrangement = Arrangement.spacedBy(Space.stack),
     ) {
         item {
-            Card(Modifier.padding(horizontal = Space.card)) {
+            Card(Modifier.padding(horizontal = Space.screen)) {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.row)) {
                     Row(
                         Modifier.fillMaxWidth(),
@@ -121,13 +124,15 @@ fun AreaDetailScreen(
                             preferences.homeAreaCode = if (isHome) null else area.code
                         },
                     )
+
+
                 }
             }
         }
 
         item {
             Column(
-                Modifier.padding(horizontal = Space.card),
+                Modifier.padding(horizontal = Space.screen),
                 verticalArrangement = Arrangement.spacedBy(Space.row),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.row)) {
@@ -172,51 +177,72 @@ fun AreaDetailScreen(
             CardSection(
                 title = loc.t("area.chart.title", area.displayName(loc.language)),
                 subtitle = loc.t("area.chart.subtitle"),
-                modifier = Modifier.padding(horizontal = Space.card),
+                modifier = Modifier.padding(horizontal = Space.screen),
             ) {
+                // Height is that week's cases, colour is the band it sat in —
+                // two readings of the same curve, as iOS has always drawn it.
                 ChartLegend(
-                    listOf(
-                        LegendItem(loc.t("dash.legend.daily"), colors.casesMuted),
-                        LegendItem(loc.t("dash.legend.average"), colors.cases, isLine = true),
-                    )
+                    RiskLevel.entries.map { LegendItem(loc.t(it.labelKey), colors.riskTint(it)) } +
+                        LegendItem(loc.t("area.legend.average"), colors.cases, isLine = true)
                 )
                 BarAverageChart(
                     bars = area.weeklyCases.mapIndexed { index, cases ->
-                        BarPoint(cases, store.epiWeeks.getOrNull(index) ?: "")
+                        BarPoint(
+                            cases,
+                            store.epiWeeks.getOrNull(index) ?: "",
+                            color = colors.riskTint(area.riskAtWeek(index)),
+                        )
                     },
                     average = average,
                     barColor = colors.casesMuted,
                     lineColor = colors.cases,
                     height = 170.dp,
-                    yAxisLabels = axisTicks(
+                    yAxisTicks = axisTicks(
                         maxOf(
                             area.weeklyCases.maxOrNull()?.toDouble() ?: 1.0,
                             average.maxOrNull() ?: 1.0,
                         )
-                    ).map { loc.compact(it) },
-                    xAxisLabels = pickLabels(store.epiWeeks, 4),
+                    ),
+                    formatTick = { loc.compact(it) },
+                    xAxisLabels = weekLabels(store.epiWeeks),
                 )
             }
         }
 
         item {
-            val peers = store.areas.filter { it.division == area.division }
+            // Biggest first, as iOS has always done. Unsorted, the feed's own
+            // order put 17,791 above 10,567 above 11,434, so the bars ran long,
+            // short, longer — a card that looks ranked, read top to bottom, and
+            // is not.
+            val peers = store.areas
+                .filter { it.division == area.division }
+                .sortedByDescending { it.seasonCases }
             val peak = maxOf(peers.maxOfOrNull { it.seasonCases } ?: 1, 1)
             CardSection(
                 title = loc.t("area.peers.title", area.division.displayName(loc.language)),
                 subtitle = loc.t("area.peers.subtitle"),
-                modifier = Modifier.padding(horizontal = Space.card),
+                modifier = Modifier.padding(horizontal = Space.screen),
             ) {
-                Column {
-                    peers.forEachIndexed { index, peer ->
-                        AreaRow(
-                            area = peer,
-                            peak = peak,
-                            onClick = if (peer.code == area.code) null else {
-                                { onOpenArea(peer) }
-                            },
-                        )
-                        if (index < peers.size - 1) HairlineDivider()
+                BoxWithConstraints {
+                    val nameMetrics = rememberAreaNameMetrics(
+                        peers.map { it.displayName(loc.language) },
+                        peers.map { loc.num(it.seasonCases) },
+                        maxWidth,
+                    )
+                    Column {
+                        peers.forEachIndexed { index, peer ->
+                            AreaRow(
+                                area = peer,
+                                peak = peak,
+                                onClick = if (peer.code == area.code) null else {
+                                    { onOpenArea(peer) }
+                                },
+                                nameScale = nameMetrics.scale,
+                                nameSlotWidth = nameMetrics.slotWidth,
+                                countWidth = nameMetrics.countWidth,
+                            )
+                            if (index < peers.size - 1) HairlineDivider()
+                        }
                     }
                 }
             }
@@ -226,7 +252,7 @@ fun AreaDetailScreen(
             item {
                 InlineNote(
                     detail = loc.t("area.apportioned.note"),
-                    modifier = Modifier.padding(horizontal = Space.card),
+                    modifier = Modifier.padding(horizontal = Space.screen),
                 )
             }
         }

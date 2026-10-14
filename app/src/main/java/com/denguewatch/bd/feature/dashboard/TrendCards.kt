@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.denguewatch.bd.feature.shared.BarAverageChart
 import com.denguewatch.bd.feature.shared.BarPoint
 import com.denguewatch.bd.feature.shared.CardSection
+import com.denguewatch.bd.feature.shared.ShrinkToFitText
 import com.denguewatch.bd.feature.shared.ChartLegend
 import com.denguewatch.bd.feature.shared.LegendItem
 import com.denguewatch.bd.feature.shared.PairedBar
@@ -32,6 +33,7 @@ import com.denguewatch.bd.feature.shared.axisTicks
 import com.denguewatch.bd.feature.shared.pickLabels
 import com.denguewatch.bd.i18n.LocalLocalization
 import com.denguewatch.bd.model.AgeBand
+import com.denguewatch.bd.model.AgeBands
 import com.denguewatch.bd.model.DailyPoint
 import com.denguewatch.bd.model.Series
 import com.denguewatch.bd.model.SexSplit
@@ -73,12 +75,13 @@ fun DeathsCard(points: List<DailyPoint>, modifier: Modifier = Modifier) {
             barColor = colors.deaths.copy(alpha = 0.35f),
             lineColor = colors.deaths,
             height = 120.dp,
-            yAxisLabels = axisTicks(
+            yAxisTicks = axisTicks(
                 maxOf(
                     points.maxOfOrNull { it.deaths }?.toDouble() ?: 1.0,
                     average.maxOrNull() ?: 1.0,
                 )
-            ).map { loc.compact(it) },
+            ),
+            formatTick = { loc.compact(it) },
             xAxisLabels = pickLabels(points.map { loc.dayMonth(it.dateMillis) }, 3),
         )
     }
@@ -138,11 +141,20 @@ fun SeasonComparisonCard(
                         )
                     }
 
-                    Text(
+                    // Wide enough for a Bengali compact figure, and shrinking
+                    // rather than wrapping if one still overflows.
+                    //
+                    // "1.4k" fits 56dp; "১.৪ হাজার" does not, and wrapped to a
+                    // second line — which left the year label and its bar
+                    // centred against a two-line value while every other row
+                    // was one line, so that row sat visibly lower than the rest.
+                    ShrinkToFitText(
                         loc.compact(year.cases),
-                        style = typo(Typo.CAPTION, FontWeight.Medium).tabularFigures(),
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.width(56.dp),
+                        style = typo(Typo.CAPTION, FontWeight.Medium)
+                            .tabularFigures()
+                            .copy(textAlign = TextAlign.End),
+                        modifier = Modifier.width(78.dp),
+                        minScale = 0.6f,
                     )
 
                     Text(
@@ -179,7 +191,7 @@ fun WhoIsAffectedCard(
 ) {
     val loc = LocalLocalization.current
     val colors = Dw.colors
-    val peak = remember(bands) { maxOf(bands.maxOfOrNull { it.total } ?: 1, 1) }
+    val peak = remember(bands) { AgeBands.sidePeak(bands) }
 
     CardSection(
         title = loc.t("who.title"),
@@ -198,38 +210,54 @@ fun WhoIsAffectedCard(
                     color = colors.cases,
                     modifier = Modifier.weight(1f),
                 )
+                // Flush right, mirroring the male figure over the left half,
+                // so each heading sits over the side of the pyramid it counts.
                 SexShare(
                     label = loc.t("who.female"),
                     value = split.female,
                     share = 1 - split.maleShare,
                     color = colors.deaths,
                     modifier = Modifier.weight(1f),
+                    alignEnd = true,
                 )
             }
         }
 
+        // The third entry appears only when the source actually carries cases
+        // of unrecorded sex, so a clean table is not given a legend key for
+        // something it does not contain.
         ChartLegend(
             listOf(
                 LegendItem(loc.t("who.male"), colors.cases),
                 LegendItem(loc.t("who.female"), colors.deaths),
-            )
+            ) + if (bands.any { it.unrecordedSex > 0 }) {
+                listOf(LegendItem(loc.t("who.unrecorded"), colors.secondaryText))
+            } else {
+                emptyList()
+            }
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             bands.forEach { band ->
+                // The feed's Western numerals, put into the reader's digits.
+                val bandLabel = AgeBands.displayLabel(band.label) { loc.num(it) }
                 val summary = loc.t(
-                    "who.a11y", band.label, loc.num(band.male), loc.num(band.female),
-                )
+                    "who.a11y", bandLabel, loc.num(band.male), loc.num(band.female),
+                ) + if (band.unrecordedSex > 0) {
+                    " " + loc.t("who.a11y.unrecorded", loc.num(band.unrecordedSex))
+                } else {
+                    ""
+                }
                 Row(
                     Modifier.fillMaxWidth().semantics { contentDescription = summary },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Space.tight),
                 ) {
                     Text(
-                        band.label,
+                        bandLabel,
                         style = typo(Typo.MICRO).tabularFigures(),
                         color = colors.secondaryText,
-                        modifier = Modifier.width(44.dp),
+                        modifier = Modifier.width(BAND_SIDE_WIDTH),
                     )
 
                     PairedBar(
@@ -239,19 +267,47 @@ fun WhoIsAffectedCard(
                         leftColor = colors.cases,
                         rightColor = colors.deaths,
                         modifier = Modifier.weight(1f).height(13.dp),
+                        unrecorded = band.unrecordedSex,
+                        unrecordedColor = colors.secondaryText,
                     )
 
-                    Text(
+                    // One line, in both languages.
+                    //
+                    // 46dp fits "4.6k" and nothing like "৪.৬ হাজার", so every
+                    // row of the pyramid wrapped in Bangla — the figure sat on
+                    // two lines beside a one-line bar, which pushed each row
+                    // apart and broke the comb of the chart. Wide enough for
+                    // the Bengali form, and shrinking rather than wrapping if
+                    // one still overflows.
+                    ShrinkToFitText(
                         loc.compact(band.total),
-                        style = typo(Typo.MICRO).tabularFigures(),
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.width(46.dp),
+                        style = typo(Typo.MICRO)
+                            .tabularFigures()
+                            .copy(textAlign = TextAlign.End),
+                        modifier = Modifier.width(BAND_SIDE_WIDTH),
+                        minScale = 0.6f,
                     )
                 }
             }
         }
     }
 }
+
+/**
+ * The gutter on each side of the age-band bars.
+ *
+ * Both sides get the same width, and that is the whole point. PairedBar draws
+ * from a centre spine, male growing left and female right, so the chart reads
+ * as a pyramid only while that spine is the middle of the card. The label gutter
+ * was 44dp against the total's 74dp, which pushed the spine 15dp to the left of
+ * centre: every row leaned, and the eye reads a lean as more men than women
+ * before it reads a single bar.
+ *
+ * Sized for the total, which is the demanding side — "৪.৬ হাজার" needs the room
+ * that "4.6k" does not. The label is flush left in its gutter and the total
+ * flush right, so neither shows the extra width; only the spine moves.
+ */
+private val BAND_SIDE_WIDTH = 74.dp
 
 @Composable
 private fun SexShare(
@@ -260,10 +316,15 @@ private fun SexShare(
     share: Double,
     color: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
+    alignEnd: Boolean = false,
 ) {
     val loc = LocalLocalization.current
     val colors = Dw.colors
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(
+        modifier,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
+    ) {
         Text(label, style = typo(Typo.MICRO), color = colors.secondaryText)
         Text(
             loc.t("who.share", loc.decimal(share * 100, places = 0)),

@@ -200,20 +200,28 @@ fun InlineNote(
     modifier: Modifier = Modifier,
     icon: ImageVector = DwIcons.info,
     title: String? = null,
+    /**
+     * Colours the symbol and its ground for a note that carries weight — a
+     * plan that has gone stale, a reading a home cuff cannot be trusted on.
+     * The text stays in the reading colour either way, so the note is never
+     * legible by colour alone.
+     */
+    tint: Color? = null,
 ) {
     val colors = Dw.colors
+    val ink = tint ?: colors.mutedInk
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(Shapes.control)
-            .background(colors.mutedInk.copy(alpha = 0.07f))
+            .background(ink.copy(alpha = if (tint == null) 0.07f else 0.10f))
             .padding(Space.row),
         horizontalArrangement = Arrangement.spacedBy(Space.tight + 2.dp),
     ) {
         Icon(
             icon,
             contentDescription = null,
-            tint = colors.mutedInk,
+            tint = ink,
             modifier = Modifier.size(16.dp).padding(top = 1.dp),
         )
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {

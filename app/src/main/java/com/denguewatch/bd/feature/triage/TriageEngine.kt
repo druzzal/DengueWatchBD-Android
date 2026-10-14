@@ -110,11 +110,43 @@ object TriageEngine {
     /**
      * Which phase of illness the person is in. The critical phase is when
      * plasma leak starts, and it is not when people feel worst.
+     *
+     * Introduced so the sentence under the result, the care plan and the fever
+     * timeline read the same boundaries from one place. The boundaries
+     * themselves are unchanged: this wraps the rule that was already here
+     * rather than restating it, so the three can never drift apart.
      */
-    fun phaseKey(feverDaysAgo: Int?): String? = when (feverDaysAgo) {
-        null -> null
-        in 0..2 -> "check.phase.febrile"
-        in 3..6 -> "check.phase.critical"
-        else -> "check.phase.recovery"
+    enum class FeverPhase {
+        FEBRILE, CRITICAL, RECOVERY;
+
+        private val slug: String
+            get() = name.lowercase()
+
+        val key: String get() = "check.phase.$slug"
+        val nameKey: String get() = "phase.$slug.name"
+
+        /**
+         * Days of fever this phase covers, counting the first day as day 1.
+         * `feverDaysAgo` is zero-based, so these run one higher.
+         */
+        val dayRange: IntRange
+            get() = when (this) {
+                FEBRILE -> 1..3
+                CRITICAL -> 4..7
+                RECOVERY -> 8..10
+            }
+
+        companion object {
+            fun of(feverDaysAgo: Int): FeverPhase = when (feverDaysAgo) {
+                in 0..2 -> FEBRILE
+                in 3..6 -> CRITICAL
+                else -> RECOVERY
+            }
+        }
     }
+
+    fun phase(feverDaysAgo: Int?): FeverPhase? =
+        feverDaysAgo?.let(FeverPhase::of)
+
+    fun phaseKey(feverDaysAgo: Int?): String? = phase(feverDaysAgo)?.key
 }

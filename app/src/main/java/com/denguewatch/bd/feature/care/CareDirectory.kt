@@ -64,8 +64,9 @@ object HospitalDirectory {
             "মুগদা মেডিকেল কলেজ হাসপাতাল", "Dhaka", "ঢাকা", Division.DHAKA),
         Hospital("kurmitola", "Kurmitola General Hospital",
             "কুর্মিটোলা জেনারেল হাসপাতাল", "Dhaka", "ঢাকা", Division.DHAKA),
-        Hospital("bsmmu", "Bangabandhu Sheikh Mujib Medical University",
-            "বঙ্গবন্ধু শেখ মুজিব মেডিকেল বিশ্ববিদ্যালয়", "Dhaka", "ঢাকা", Division.DHAKA),
+        // Formerly BSMMU; renamed in 2024.
+        Hospital("bsmmu", "Bangladesh Medical University",
+            "বাংলাদেশ মেডিকেল বিশ্ববিদ্যালয়", "Shahbag, Dhaka", "শাহবাগ, ঢাকা", Division.DHAKA),
         Hospital("kuwait", "Kuwait Bangladesh Friendship Government Hospital",
             "কুয়েত বাংলাদেশ ফ্রেন্ডশিপ সরকারি হাসপাতাল", "Uttara, Dhaka", "উত্তরা, ঢাকা", Division.DHAKA),
         Hospital("shishu", "Dhaka Shishu (Children) Hospital",

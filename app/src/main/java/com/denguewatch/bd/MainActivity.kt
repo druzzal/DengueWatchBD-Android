@@ -3,6 +3,7 @@ package com.denguewatch.bd
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -22,10 +23,25 @@ class MainActivity : ComponentActivity() {
 
     private var hasNotificationPermission by mutableStateOf(true)
 
+    /**
+     * Whether the reader has been asked for location and said no.
+     *
+     * Needed because Android will not show its prompt a second time: after a
+     * refusal an "Allow" button does nothing at all, so the explainer card has
+     * to stop offering one and point at the manual route instead. Distinct
+     * from "not authorised", which is also true before anyone has been asked.
+     */
+    private var locationDenied by mutableStateOf(false)
+
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { granted ->
-        if (granted.values.any { it }) state.location.refresh()
+        if (granted.values.any { it }) {
+            locationDenied = false
+            state.location.refresh()
+        } else {
+            locationDenied = true
+        }
     }
 
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -69,10 +85,25 @@ class MainActivity : ComponentActivity() {
                 onOpenUrl = ::openUrl,
                 onOpenMapQuery = ::openMapQuery,
                 onRequestLocation = ::requestLocation,
+                locationDenied = locationDenied,
                 onRequestNotifications = ::requestNotifications,
                 onRequestBackgroundLocation = ::requestBackgroundLocation,
             )
         }
+    }
+
+    /**
+     * Rotation, split screen and a dark-mode switch are handled in place rather
+     * than by recreating the activity. Navigation and the recording forms live
+     * in composition state, so a recreate sent the reader back to the tabs and
+     * emptied a half-entered reading — with auto-rotate on, or dark mode on a
+     * schedule, that happened without the reader doing anything. Compose
+     * follows the new configuration by itself; only the system bar icons,
+     * which pick light or dark once, need telling.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        enableEdgeToEdge()
     }
 
     override fun onResume() {

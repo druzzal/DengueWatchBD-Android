@@ -45,8 +45,11 @@ class NoTruncationTest {
         //   * ShrinkToFitText is the sanctioned fix — it pins maxLines to 1 so
         //     Compose's auto-sizing has a single line to size against, and the
         //     text shrinks rather than losing a character.
-        //   * An OutlinedTextField's maxLines bounds how far the *input box*
-        //     grows; what the user typed scrolls and is never discarded.
+        //   * A text field's maxLines bounds how far the *input box* grows;
+        //     what the user typed scrolls and is never discarded. True of
+        //     BasicTextField as much as OutlinedTextField — the note fields
+        //     moved from one to the other to match the iOS form, and naming
+        //     only the latter here turned that into a spurious failure.
         val exempt = Regex("""maxLines\s*=\s*\d+""")
         val offenders = mutableListOf<String>()
 
@@ -56,7 +59,8 @@ class NoTruncationTest {
                 if (!exempt.containsMatchIn(line)) return@forEachIndexed
                 val isAutoSize = file.name == "Components.kt" &&
                     text.contains("fun ShrinkToFitText")
-                val isTextFieldGrowth = text.contains("OutlinedTextField")
+                val isTextFieldGrowth = text.contains("OutlinedTextField") ||
+                    text.contains("BasicTextField")
                 if (!isAutoSize && !isTextFieldGrowth) {
                     offenders += "${file.name}:${index + 1}: ${line.trim()}"
                 }

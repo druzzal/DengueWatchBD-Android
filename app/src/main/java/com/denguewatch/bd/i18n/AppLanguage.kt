@@ -62,35 +62,67 @@ data class NumberStyle(val language: AppLanguage) {
         return text.map { map[it] ?: it }.joinToString("")
     }
 
+    /**
+     * Grouped the way Bangladesh groups numbers — 1,05,316, not 105,316 — as
+     * iOS prints them for en_BD and bn_BD alike.
+     */
     fun num(value: Int): String =
-        digits(NumberFormat.getIntegerInstance(Locale.ENGLISH).format(value))
+        digits((if (value < 0) "-" else "") + lakhGrouped(abs(value.toLong()).toString()))
 
     fun decimal(value: Double, places: Int = 1): String {
         val formatter = NumberFormat.getNumberInstance(Locale.ENGLISH).apply {
             minimumFractionDigits = places
             maximumFractionDigits = places
+            isGroupingUsed = false
         }
-        return digits(formatter.format(value))
+        val plain = formatter.format(value)
+        val sign = if (plain.startsWith("-")) "-" else ""
+        val whole = plain.removePrefix("-").substringBefore('.')
+        val fraction = plain.substringAfter('.', "")
+        return digits(sign + lakhGrouped(whole) + if (fraction.isEmpty()) "" else ".$fraction")
+    }
+
+    /**
+     * The last three digits, then pairs: the South Asian grouping. Written out
+     * because java.text cannot express a secondary grouping size, and
+     * android.icu, which can, is not there for the JVM tests.
+     */
+    private fun lakhGrouped(whole: String): String {
+        if (whole.length <= 3) return whole
+        val pairs = whole.dropLast(3).reversed().chunked(2).joinToString(",").reversed()
+        return pairs + "," + whole.takeLast(3)
     }
 
     /**
      * Bengali uses হাজার / লাখ rather than k / M, because "১০১k" is not how
      * anyone reads a number in Bengali.
+     *
+     * Each unit takes over from the value that would round up to it, as on
+     * iOS, so 99,600 reads "১.০ লাখ" rather than "১০০ হাজার", and 999,600
+     * "1.0M" rather than "1000k".
      */
     fun compact(value: Int): String = when (language) {
         AppLanguage.ENGLISH -> when {
-            value >= 1_000_000 -> String.format(Locale.ENGLISH, "%.1fM", value / 1_000_000.0)
-            value >= 10_000 -> String.format(Locale.ENGLISH, "%.0fk", value / 1_000.0)
+            value >= 999_500 -> String.format(Locale.ENGLISH, "%.1fM", value / 1_000_000.0)
+            value >= 9_950 -> String.format(Locale.ENGLISH, "%.0fk", value / 1_000.0)
             value >= 1_000 -> String.format(Locale.ENGLISH, "%.1fk", value / 1_000.0)
             else -> num(value)
         }
         AppLanguage.BANGLA -> when {
-            value >= 10_000_000 ->
+            value >= 9_995_000 ->
                 digits(String.format(Locale.ENGLISH, "%.1f", value / 10_000_000.0)) + " কোটি"
-            value >= 100_000 ->
+            value >= 99_500 ->
                 digits(String.format(Locale.ENGLISH, "%.1f", value / 100_000.0)) + " লাখ"
-            value >= 1_000 ->
+            // Below ten thousand a whole-thousand label is too coarse to be
+            // true. This band rounded to the nearest thousand while English
+            // kept a decimal, so a chart axis tick of 2,500 was labelled
+            // "৩ হাজার" — three thousand — and the ticks 2,500 / 1,875 / 1,250
+            // collapsed onto ৩ / ২ / ১ হাজার, which also made an uneven axis
+            // look evenly stepped. The two languages now round the same way.
+            value >= 9_950 ->
                 digits(String.format(Locale.ENGLISH, "%.0f", value / 1_000.0)) + " হাজার"
+            value >= 1_000 ->
+                digits(String.format(Locale.ENGLISH, "%.1f", value / 1_000.0)) + " হাজার"
             else -> num(value)
         }
     }
@@ -107,8 +139,74 @@ data class NumberStyle(val language: AppLanguage) {
     fun dayMonth(millis: Long): String =
         digits(SimpleDateFormat("d MMM", locale).format(Date(millis)))
 
-    fun dateTime(millis: Long): String =
-        digits(SimpleDateFormat("d MMM, HH:mm", locale).format(Date(millis)))
+    /**
+     * The date under "Today in Bangladesh", which Bangla sets month first.
+     *
+     * CLDR orders both bn_BD and en_BD day-first, so the Bangla form is an
+     * explicit pattern — set that way on the author's instruction in the iOS
+     * build rather than derived. English keeps the locale's own order.
+     */
+    fun reportedDate(millis: Long): String =
+        if (language == AppLanguage.BANGLA) {
+            digits(SimpleDateFormat("MMMM d", locale).format(Date(millis)))
+        } else {
+            dayMonth(millis)
+        }
+
+    /**
+     * The date as the iOS picker shows it in the recording screens:
+     * "14 Oct, 2026". The year is there because a reading can be dated up to a
+     * year back, and "14 Oct" alone does not say which one.
+     */
+    fun pickerDate(millis: Long): String =
+        digits(shortMonthFormat("d MMM, yyyy").format(Date(millis)))
+
+    /**
+     * A formatter whose Bangla short months are the ones iOS prints — "অক্টো",
+     * not Android's "অক্টোবর" — so a reading's date reads the same on both, and
+     * fits beside its label instead of pushing it onto a second line.
+     */
+    private fun shortMonthFormat(pattern: String): SimpleDateFormat =
+        SimpleDateFormat(pattern, locale).apply {
+            if (language == AppLanguage.BANGLA) {
+                dateFormatSymbols = dateFormatSymbols.apply { shortMonths = BANGLA_SHORT_MONTHS }
+            }
+        }
+
+    /**
+     * Clock time alone, for a record that already states the day.
+     *
+     * Twelve-hour, as iOS shows it in both languages: "5:02 PM", "৫:০২ PM".
+     * CLDR gives bn_BD the Latin AM/PM as well, so the marker is formatted in
+     * English rather than left to whichever ICU the phone happens to carry.
+     */
+    fun timeOfDay(millis: Long): String =
+        digits(SimpleDateFormat("h:mm a", Locale.ENGLISH).format(Date(millis)))
+
+    /**
+     * Weekday-or-"today" plus the clock time, ported from iOS.
+     *
+     * Health readings need the actual moment, not "2 hours ago": a temperature
+     * taken at 3am rather than after lunch is the difference between a fever
+     * chart that means something and one that does not. Recent days are named
+     * rather than dated, because "Today, 2:20 PM" is read faster than
+     * "13 Sep, 2:20 PM" when it is in fact today.
+     */
+    fun dayAndTime(
+        millis: Long,
+        todayLabel: String,
+        yesterdayLabel: String,
+        now: Long = System.currentTimeMillis(),
+    ): String {
+        val time = timeOfDay(millis)
+        when (daysBetween(millis, now)) {
+            0 -> return "$todayLabel, $time"
+            1 -> return "$yesterdayLabel, $time"
+        }
+        // Whole days elapsed, as iOS counts it here, not calendar days.
+        val pattern = if ((now - millis) / 86_400_000L < 7) "EEEE" else "EEE, d MMM"
+        return digits(shortMonthFormat(pattern).format(Date(millis))) + ", " + time
+    }
 
     /**
      * A relative description ("2 days ago"). Written out rather than delegated
@@ -149,6 +247,14 @@ data class NumberStyle(val language: AppLanguage) {
         val from = Calendar.getInstance().apply { timeInMillis = fromMillis }.startOfDay()
         val to = Calendar.getInstance().apply { timeInMillis = toMillis }.startOfDay()
         return ((to - from) / 86_400_000L).toInt()
+    }
+
+    private companion object {
+        /** CLDR's bn abbreviations as Apple ships them. */
+        val BANGLA_SHORT_MONTHS = arrayOf(
+            "জানু", "ফেব", "মার্চ", "এপ্রি", "মে", "জুন",
+            "জুল", "আগ", "সেপ", "অক্টো", "নভে", "ডিসে",
+        )
     }
 
     private fun Calendar.startOfDay(): Long {

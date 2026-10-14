@@ -142,12 +142,13 @@ fun TrendCard(
                 lineColor = colors.cases,
                 selectedIndex = selectedIndex,
                 onSelect = { selectedIndex = it },
-                yAxisLabels = axisTicks(
+                yAxisTicks = axisTicks(
                     maxOf(
                         series.maxOfOrNull { it.cases }?.toDouble() ?: 1.0,
                         average.maxOrNull() ?: 1.0,
                     )
-                ).map { loc.compact(it) },
+                ),
+                formatTick = { loc.compact(it) },
                 xAxisLabels = pickLabels(
                     series.map { loc.dayMonth(it.dateMillis) },
                     if (range == TrendRange.MONTH) 4 else 3,

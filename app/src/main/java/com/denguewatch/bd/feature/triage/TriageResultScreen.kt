@@ -20,9 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,12 +30,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
 import com.denguewatch.bd.AppState
-import com.denguewatch.bd.data.CaseLogEntry
 import com.denguewatch.bd.feature.shared.CardSection
 import com.denguewatch.bd.feature.shared.PrimaryActionButton
 import com.denguewatch.bd.feature.shared.SecondaryActionButton
@@ -96,9 +91,6 @@ fun TriageResultScreen(
             }
     }
 
-    var note by remember { mutableStateOf("") }
-    var temperature by remember { mutableStateOf("") }
-    var saved by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize().background(colors.plane),
@@ -109,7 +101,7 @@ fun TriageResultScreen(
         item {
             Column(
                 Modifier
-                    .padding(horizontal = Space.card)
+                    .padding(horizontal = Space.screen)
                     .fillMaxWidth()
                     .clip(Shapes.card)
                     .background(colors.card)
@@ -154,7 +146,7 @@ fun TriageResultScreen(
             item {
                 CardSection(
                     title = loc.t("check.title"),
-                    modifier = Modifier.padding(horizontal = Space.card),
+                    modifier = Modifier.padding(horizontal = Space.screen),
                 ) {
                     Row(
                         Modifier
@@ -186,7 +178,7 @@ fun TriageResultScreen(
         item {
             CardSection(
                 title = loc.t("result.whatToDo"),
-                modifier = Modifier.padding(horizontal = Space.card),
+                modifier = Modifier.padding(horizontal = Space.screen),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.row)) {
                     outcome.actionKeys.forEachIndexed { index, key ->
@@ -218,7 +210,7 @@ fun TriageResultScreen(
         if (outcome == TriageOutcome.EMERGENCY || outcome == TriageOutcome.SEE_DOCTOR_TODAY) {
             item {
                 Column(
-                    Modifier.padding(horizontal = Space.card),
+                    Modifier.padding(horizontal = Space.screen),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     PrimaryActionButton(
@@ -233,59 +225,6 @@ fun TriageResultScreen(
                         onClick = onFindCare,
                     )
                 }
-            }
-        }
-
-        // The log
-        item {
-            CardSection(
-                title = loc.t("result.addToLog"),
-                subtitle = loc.t("result.keptOnPhone"),
-                modifier = Modifier.padding(horizontal = Space.card),
-            ) {
-                OutlinedTextField(
-                    value = temperature,
-                    onValueChange = { temperature = it },
-                    label = { Text(loc.t("result.temperature"), style = typo(Typo.CAPTION)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = Shapes.control,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = colors.card,
-                        unfocusedContainerColor = colors.card,
-                    ),
-                )
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text(loc.t("result.note"), style = typo(Typo.CAPTION)) },
-                    minLines = 2,
-                    maxLines = 4,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = Shapes.control,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = colors.card,
-                        unfocusedContainerColor = colors.card,
-                    ),
-                )
-                PrimaryActionButton(
-                    title = loc.t(if (saved) "common.saved" else "result.saveEntry"),
-                    icon = if (saved) DwIcons.check2 else DwIcons.save,
-                    enabled = !saved,
-                    onClick = {
-                        state.caseLog.add(
-                            CaseLogEntry(
-                                temperature = temperature.toDoubleOrNull(),
-                                symptomIds = selected.toList(),
-                                outcomeOrdinal = outcome.ordinal,
-                                areaCode = state.preferences.homeAreaCode,
-                                note = note,
-                            )
-                        )
-                        saved = true
-                    },
-                )
             }
         }
 

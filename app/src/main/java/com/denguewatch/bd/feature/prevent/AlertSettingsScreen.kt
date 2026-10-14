@@ -81,7 +81,7 @@ fun AlertSettingsScreen(
             item {
                 CardSection(
                     title = loc.t("alerts.denied.title"),
-                    modifier = Modifier.padding(horizontal = Space.card),
+                    modifier = Modifier.padding(horizontal = Space.screen),
                 ) {
                     Text(
                         loc.t("alerts.denied.message"),
@@ -100,7 +100,7 @@ fun AlertSettingsScreen(
         item {
             CardSection(
                 title = loc.t("geo.section"),
-                modifier = Modifier.padding(horizontal = Space.card),
+                modifier = Modifier.padding(horizontal = Space.screen),
             ) {
                 ToggleRow(
                     title = loc.t("geo.toggle"),
@@ -181,7 +181,7 @@ fun AlertSettingsScreen(
         item {
             CardSection(
                 title = loc.t("alerts.myArea"),
-                modifier = Modifier.padding(horizontal = Space.card),
+                modifier = Modifier.padding(horizontal = Space.screen),
             ) {
                 // The chosen area reads as a fact with its band beside it, and
                 // changing it is a separate row — as on iOS. Rolling both into
@@ -221,7 +221,7 @@ fun AlertSettingsScreen(
         item {
             CardSection(
                 title = loc.t("alerts.notifications"),
-                modifier = Modifier.padding(horizontal = Space.card),
+                modifier = Modifier.padding(horizontal = Space.screen),
             ) {
                 ToggleRow(
                     title = loc.t("alerts.riseToggle"),
@@ -277,7 +277,7 @@ fun AlertSettingsScreen(
             item {
                 CardSection(
                     title = loc.t("alerts.preview"),
-                    modifier = Modifier.padding(horizontal = Space.card),
+                    modifier = Modifier.padding(horizontal = Space.screen),
                 ) {
                     val name = homeArea.displayName(loc.language)
                     val band = loc.t(homeArea.risk.labelKey)

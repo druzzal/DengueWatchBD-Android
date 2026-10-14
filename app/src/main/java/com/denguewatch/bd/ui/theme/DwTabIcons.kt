@@ -1,6 +1,7 @@
 package com.denguewatch.bd.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -53,6 +54,22 @@ private fun ImageVector.Builder.stroked(
 private fun ImageVector.Builder.filled(
     block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit,
 ) = path(fill = SolidColor(Color.Black), pathBuilder = block)
+
+/**
+ * Filled, with inner subpaths punched out rather than drawn over.
+ *
+ * `heart.text.square` is a solid tile with the heart and the line showing the
+ * surface behind it. Painting them in the background colour would work until
+ * the tile sat on the selected tab's tinted pill, where the wrong colour would
+ * show through — an even-odd hole is the surface, whatever it happens to be.
+ */
+private fun ImageVector.Builder.punched(
+    block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit,
+) = path(
+    fill = SolidColor(Color.Black),
+    pathFillType = PathFillType.EvenOdd,
+    pathBuilder = block,
+)
 
 /** `chart.line.uptrend.xyaxis` — axes, a rising series, an arrow head. */
 val DwTabIcons_Trend: ImageVector by lazy {
@@ -127,6 +144,43 @@ val DwTabIcons_Shield: ImageVector by lazy {
             lineTo(4f, 5.5f)
             lineTo(4f, 11.5f)
             curveTo(4f, 16.7f, 7.4f, 20.7f, 12f, 21.9f)
+            close()
+        }
+    }
+}
+
+/** `heart.text.square` — a card with a heart over a line of writing. */
+val DwTabIcons_HealthCard: ImageVector by lazy {
+    icon("dw_health_card") {
+        punched {
+            // The tile.
+            moveTo(7.5f, 3f)
+            lineTo(16.5f, 3f)
+            arcToRelative(4.5f, 4.5f, 0f, false, true, 4.5f, 4.5f)
+            lineTo(21f, 16.5f)
+            arcToRelative(4.5f, 4.5f, 0f, false, true, -4.5f, 4.5f)
+            lineTo(7.5f, 21f)
+            arcToRelative(4.5f, 4.5f, 0f, false, true, -4.5f, -4.5f)
+            lineTo(3f, 7.5f)
+            arcToRelative(4.5f, 4.5f, 0f, false, true, 4.5f, -4.5f)
+            close()
+
+            // The heart, punched out of it.
+            moveTo(12f, 14.1f)
+            curveTo(12f, 14.1f, 8.1f, 11.6f, 8.1f, 9.7f)
+            curveTo(8.1f, 8.5f, 9f, 7.7f, 10f, 7.7f)
+            curveTo(10.85f, 7.7f, 11.6f, 8.25f, 12f, 8.85f)
+            curveTo(12.4f, 8.25f, 13.15f, 7.7f, 14f, 7.7f)
+            curveTo(15f, 7.7f, 15.9f, 8.5f, 15.9f, 9.7f)
+            curveTo(15.9f, 11.6f, 12f, 14.1f, 12f, 14.1f)
+            close()
+
+            // The line of writing under it.
+            moveTo(8.4f, 16f)
+            lineTo(15.6f, 16f)
+            arcToRelative(0.7f, 0.7f, 0f, false, true, 0f, 1.4f)
+            lineTo(8.4f, 17.4f)
+            arcToRelative(0.7f, 0.7f, 0f, false, true, 0f, -1.4f)
             close()
         }
     }

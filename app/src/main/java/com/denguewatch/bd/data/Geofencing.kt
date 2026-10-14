@@ -91,10 +91,13 @@ object Geofencing {
                 .setRequestId(area.code)
                 .setCircularRegion(area.latitude, area.longitude, area.radiusMeters.toFloat())
                 .setExpirationDuration(Geofence.NEVER_EXPIRE)
-                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
-                // The reader has to be inside for a couple of minutes before we
-                // say anything. Without it, driving past the edge of a division
-                // raises an alert about somewhere they never stopped.
+                // DWELL, not ENTER: the reader has to be inside for a couple of
+                // minutes before we say anything. Without it, driving past the
+                // edge of a division raises an alert about somewhere they never
+                // stopped. The loitering delay only applies to DWELL — on the
+                // ENTER fence this used to be, it was silently ignored and every
+                // pass-through fired.
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_DWELL)
                 .setLoiteringDelay(120_000)
                 .build()
         }
@@ -177,13 +180,37 @@ class GeofenceReceiver : BroadcastReceiver() {
             GeofenceStatusCodes.getStatusCodeString(event.errorCode)
             return
         }
-        if (event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_ENTER) return
+        if (event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_DWELL) return
 
         Notifications.createChannels(context)
         event.triggeringGeofences.orEmpty().forEach { fence ->
             WatchedAreaStore.area(context, fence.requestId)?.let { area ->
                 Notifications.raiseGeofenceAlert(context, area)
             }
+        }
+    }
+}
+
+/**
+ * Re-arms the warnings after a restart or an update.
+ *
+ * Android drops every registered geofence when the phone restarts, and this app
+ * never put them back: the warning sat switched on and watching nothing until
+ * the six-hourly refresh next ran, which Doze can stretch much further. The
+ * fences are re-armed from the figures already on disk, so this needs no
+ * network and does not wait for one.
+ *
+ * Exported because the system delivers these broadcasts from outside the app.
+ * Both are protected broadcasts only the system can send, and an intent with
+ * any other action is ignored, so another app reaching it can do no more than
+ * re-arm what is already armed.
+ */
+class GeofenceRearmReceiver : BroadcastReceiver() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED -> BackgroundRefresh.rearmGeofences(context)
         }
     }
 }

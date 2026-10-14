@@ -50,8 +50,22 @@ data class DwColors(
 
     val upIsBad: Color,
     val downIsGood: Color,
+
+    /**
+     * The app's theme colour: cyan, and dark enough to be legible as text.
+     *
+     * Measured, not picked by eye. #0088b0 is the cyan you reach for first and
+     * it reaches only 4.08:1 on white, under the 4.5:1 small-text bar. This
+     * step measures 4.93:1 on white and 4.52:1 on the plane, so a link or a
+     * button label set in it is readable everywhere it appears.
+     *
+     * Deliberately not the same value as [cases]. That blue is the chart's
+     * identity for case counts and means something specific wherever it
+     * appears; the accent is chrome. They were one colour here until now, so
+     * every tinted control was claiming to be about cases.
+     */
+    val accent: Color,
 ) {
-    val accent: Color get() = cases
 
     /**
      * Card lift. Light mode gets a real (if quiet) shadow so cards read as
@@ -94,6 +108,7 @@ data class DwColors(
     companion object {
         val Light = DwColors(
             dark = false,
+            accent = Color(0xFF007A9C),
             cases = Color(0xFF2A78D6),
             casesMuted = Color(0xFF86B6EF),
             admitted = Color(0xFF1BAF7A),
@@ -113,6 +128,7 @@ data class DwColors(
 
         val Dark = DwColors(
             dark = true,
+            accent = Color(0xFF3FC4EA),
             cases = Color(0xFF3987E5),
             casesMuted = Color(0xFF256ABF),
             admitted = Color(0xFF199E70),

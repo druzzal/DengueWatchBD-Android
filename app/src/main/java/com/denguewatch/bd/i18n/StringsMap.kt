@@ -5,6 +5,15 @@ package com.denguewatch.bd.i18n
 // platform; the iOS tables spell the same slot %@.
 
 internal val enMap: Map<String, String> = mapOf(
+    // Shareable surveillance card
+    "share.button" to "Share this area",
+    "share.appName" to "DengueWatch BD",
+    "share.tagline" to "Independent app using official DGHS data",
+    "share.unit.incidence" to "cases per 100,000\nlast 14 days",
+    "share.unit.season" to "reported this season",
+    "share.change" to "%s on last week",
+    "share.source" to "Source: DGHS · %s",
+    "share.sourceNoDate" to "Source: DGHS",
     "area.apportioned.note" to "Weekly figures for the Dhaka city corporations are shared out from the Dhaka division series, which is the finest weekly breakdown DGHS publishes. Season cases and deaths are reported for this area directly.",
     "map.title" to "Where it is spreading",
     "map.metric.total" to "Total cases",
@@ -38,6 +47,7 @@ internal val enMap: Map<String, String> = mapOf(
     "area.share" to "%s%% of national cases",
     "area.chart.title" to "Cases in %s",
     "area.chart.subtitle" to "Cases by epidemiological week, with a 3-week average",
+    "area.legend.average" to "3-week average",
     "area.peers.title" to "Rest of %s division",
     "area.peers.subtitle" to "Season cases in neighbouring areas",
     "area.picker.title" to "My area",
@@ -45,6 +55,15 @@ internal val enMap: Map<String, String> = mapOf(
 )
 
 internal val bnMap: Map<String, String> = mapOf(
+    // শেয়ারযোগ্য কার্ড
+    "share.button" to "এই এলাকা শেয়ার করুন",
+    "share.appName" to "ডেঙ্গুওয়াচ বিডি",
+    "share.tagline" to "স্বাস্থ্য অধিদপ্তরের সরকারি তথ্য ব্যবহারকারী স্বাধীন অ্যাপ",
+    "share.unit.incidence" to "প্রতি লাখে রোগী\nগত ১৪ দিনে",
+    "share.unit.season" to "এ মৌসুমে শনাক্ত",
+    "share.change" to "গত সপ্তাহের তুলনায় %s",
+    "share.source" to "উৎস: স্বাস্থ্য অধিদপ্তর · %s",
+    "share.sourceNoDate" to "উৎস: স্বাস্থ্য অধিদপ্তর",
     "area.apportioned.note" to "ঢাকার সিটি করপোরেশনগুলোর সাপ্তাহিক হিসাব ঢাকা বিভাগের সিরিজ থেকে ভাগ করে বের করা — স্বাস্থ্য অধিদপ্তর সাপ্তাহিক হিসাব এর চেয়ে সূক্ষ্মভাবে প্রকাশ করে না। মৌসুমের রোগী ও মৃত্যু সরাসরি এই এলাকার জন্যই জানানো।",
     "map.title" to "কোথায় ছড়াচ্ছে",
     "map.metric.total" to "মোট রোগী",
@@ -56,10 +75,10 @@ internal val bnMap: Map<String, String> = mapOf(
     "map.showMap" to "মানচিত্র দেখুন",
     "map.search" to "এলাকা বা বিভাগ খুঁজুন",
     "map.list.divisions" to "বিভাগ অনুযায়ী · মৌসুমের রোগী",
-    "map.list.areas" to "সব রিপোর্টিং এলাকা · মৌসুমের রোগী",
+    "map.list.areas" to "সব এলাকা · মৌসুমের রোগী",
     "map.list.footer" to "ঝুঁকি হিসাব করা হয় ১৪ দিনে প্রতি লাখ বাসিন্দায় শনাক্ত রোগী দিয়ে: ৫-এর কম কম, ৫–২০ মাঝারি, ২০–৬০ বেশি, ৬০-এর বেশি তীব্র।",
     "map.bubble.a11y" to "%s, %s জন আক্রান্ত, ঝুঁকি %s",
-    "map.you.inArea" to "আপনি আছেন %s এলাকায়",
+    "map.you.inArea" to "আপনি %s এলাকায় আছেন",
     "map.you.enable" to "আমার অবস্থান দেখান",
     "map.you.denied" to "অবস্থান বন্ধ আছে। মানচিত্রে নিজের অবস্থান দেখতে সেটিংসে গিয়ে ডেঙ্গুওয়াচের জন্য চালু করুন।",
     "map.you.locating" to "আপনার অবস্থান খোঁজা হচ্ছে…",
@@ -78,6 +97,7 @@ internal val bnMap: Map<String, String> = mapOf(
     "area.share" to "জাতীয় রোগীর %s%%",
     "area.chart.title" to "%s এলাকার রোগী",
     "area.chart.subtitle" to "সপ্তাহভিত্তিক রোগী, সঙ্গে ৩ সপ্তাহের গড়",
+    "area.legend.average" to "৩ সপ্তাহের গড়",
     "area.peers.title" to "%s বিভাগের অন্যান্য এলাকা",
     "area.peers.subtitle" to "পার্শ্ববর্তী এলাকাগুলোতে মৌসুমের রোগী",
     "area.picker.title" to "আমার এলাকা",

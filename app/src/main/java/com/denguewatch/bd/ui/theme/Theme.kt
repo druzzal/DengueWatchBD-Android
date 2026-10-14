@@ -9,6 +9,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.LineHeightStyle
 
@@ -78,6 +79,7 @@ fun DengueWatchTheme(
     CompositionLocalProvider(
         LocalDwColors provides colors,
         LocalTextStyle provides baseStyle.copy(color = colors.primaryText),
+        LocalTypeScale provides TypeScale.forSmallestWidth(LocalConfiguration.current.smallestScreenWidthDp),
     ) {
         MaterialTheme(
             colorScheme = scheme,

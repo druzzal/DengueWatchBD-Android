@@ -53,6 +53,20 @@ enum class LabMeasure {
 
     fun status(value: Double): MeasureStatus =
         MeasureStatus.of(value, usual = typical, far = markedlyAbnormal)
+
+    /**
+     * Which side of the typical range a reading fell on, in words.
+     *
+     * The tint already says something is off; this says what. Colour on its own
+     * is not a reading a colour-blind person can take, and the number that
+     * matters most on this card is a platelet count. Matches iOS, which prints
+     * the same three words.
+     */
+    fun flagKey(value: Double): String = when {
+        value < typical.start -> "lab.flag.low"
+        value > typical.endInclusive -> "lab.flag.high"
+        else -> "lab.flag.ok"
+    }
 }
 
 /**

@@ -26,3 +26,20 @@
 # Keep line numbers so a crash report from a release build can still be read.
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# ML Kit finds its own components by reading registrar class names out of the
+# merged manifest and calling each one's no-arg constructor by reflection. R8
+# cannot see that call, so it strips the constructors and component discovery
+# fails — which takes the text recogniser with it, and with that the whole
+# "scan a report" path.
+#
+# It fails quietly. The only sign is three ComponentDiscovery warnings at
+# startup, and the release build is the only build that shows them: the debug
+# build logs none, which is how this was found at all. Keep the constructors.
+-keep class * implements com.google.firebase.components.ComponentRegistrar {
+    <init>();
+}
+-keep class com.google.mlkit.**.internal.*Registrar {
+    <init>();
+}
+-dontwarn com.google.mlkit.**

@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -75,6 +77,26 @@ class RefreshWorker(
     }
 }
 
+/**
+ * Puts the geofences back from the figures on disk. See [GeofenceRearmReceiver].
+ */
+class GeofenceRearmWorker(
+    context: Context,
+    params: WorkerParameters,
+) : CoroutineWorker(context, params) {
+
+    override suspend fun doWork(): Result {
+        val context = applicationContext
+        val preferences = Preferences(context)
+        if (!preferences.geofenceAlertsEnabled) return Result.success()
+
+        val store = DengueStore(BundledFeedService(context))
+        store.load()
+        Geofencing.arm(context, store.areasToMonitor(preferences.alertThreshold))
+        return Result.success()
+    }
+}
+
 /** Posts the Sunday-morning summary. */
 class WeeklyDigestWorker(
     context: Context,
@@ -100,6 +122,19 @@ object BackgroundRefresh {
 
     private const val REFRESH_WORK = "dengue-refresh"
     private const val DIGEST_WORK = "dengue-weekly-digest"
+    private const val REARM_WORK = "dengue-geofence-rearm"
+
+    /**
+     * Re-arm the entry warning now, from what is on disk. One-off and with no
+     * network constraint, because the point is not to wait.
+     */
+    fun rearmGeofences(context: Context) {
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            REARM_WORK,
+            ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<GeofenceRearmWorker>().build(),
+        )
+    }
 
     /**
      * Called on every launch. `KEEP` rather than `UPDATE` so an app that is

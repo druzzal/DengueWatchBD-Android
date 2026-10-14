@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,6 +38,7 @@ import com.denguewatch.bd.AppState
 import com.denguewatch.bd.feature.shared.CardSection
 import com.denguewatch.bd.feature.shared.HairlineDivider
 import com.denguewatch.bd.feature.shared.InlineNote
+import com.denguewatch.bd.feature.location.LocationPermissionCard
 import com.denguewatch.bd.feature.shared.PrimaryActionButton
 import com.denguewatch.bd.feature.shared.ScreenTitle
 import com.denguewatch.bd.i18n.LocalLocalization
@@ -65,6 +68,12 @@ fun CareScreen(
     onCall: (String) -> Unit,
     onOpenMap: (String) -> Unit,
     onSearchNearby: () -> Unit,
+    onRequestLocation: () -> Unit,
+    /**
+     * True once the reader has refused. Android will not show its prompt again
+     * after that, so the card has to stop offering a button that does nothing.
+     */
+    deniedLocation: Boolean,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
@@ -79,24 +88,27 @@ fun CareScreen(
         verticalArrangement = Arrangement.spacedBy(Space.stack),
     ) {
         run {
-            item { ScreenTitle(loc.t("care.title"), Modifier.padding(horizontal = Space.card)) }
+            item { ScreenTitle(loc.t("care.title"), Modifier.padding(horizontal = Space.screen)) }
         }
 
         // MARK: Emergency numbers
         item {
             CardSection(
                 title = loc.t("care.sos.title"),
-                modifier = Modifier.padding(horizontal = Space.card),
+                modifier = Modifier.padding(horizontal = Space.screen),
             ) {
                 Column {
+                    // Stacked at large text sizes, as iOS does at its
+                    // accessibility sizes. Side by side, the chip holds its
+                    // width while the name gives ground, so "999 — National
+                    // Emergency Service" broke into a column of fragments —
+                    // and the people who set a large font are the ones who
+                    // most need to read an emergency number.
+                    val stacked = LocalDensity.current.fontScale >= 1.5f
                     EmergencyNumber.all.forEachIndexed { index, number ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 11.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Space.row),
-                        ) {
+                        val details = @Composable { detailModifier: Modifier ->
                             Column(
-                                Modifier.weight(1f),
+                                detailModifier,
                                 verticalArrangement = Arrangement.spacedBy(3.dp),
                             ) {
                                 Text(
@@ -109,11 +121,30 @@ fun CareScreen(
                                     color = colors.secondaryText,
                                 )
                             }
-
-                            CallChip(
-                                isEmergency = number.isEmergency,
-                                onClick = { onCall(number.dial) },
-                            )
+                        }
+                        if (stacked) {
+                            Column(
+                                Modifier.fillMaxWidth().padding(vertical = 11.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                details(Modifier)
+                                CallChip(
+                                    isEmergency = number.isEmergency,
+                                    onClick = { onCall(number.dial) },
+                                )
+                            }
+                        } else {
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Space.row),
+                            ) {
+                                details(Modifier.weight(1f))
+                                CallChip(
+                                    isEmergency = number.isEmergency,
+                                    onClick = { onCall(number.dial) },
+                                )
+                            }
                         }
                         if (index < EmergencyNumber.all.size - 1) HairlineDivider()
                     }
@@ -131,13 +162,25 @@ fun CareScreen(
             CardSection(
                 title = loc.t("care.nearby.title"),
                 subtitle = loc.t("care.nearby.subtitle"),
-                modifier = Modifier.padding(horizontal = Space.card),
+                modifier = Modifier.padding(horizontal = Space.screen),
             ) {
-                PrimaryActionButton(
-                    title = loc.t("care.nearby.search"),
-                    icon = DwIcons.myLocation,
-                    onClick = onSearchNearby,
-                )
+                // Without permission the search cannot say anything about
+                // "near you", so iOS explains first and offers the manual
+                // route. Sending someone to a maps app that then asks for
+                // location itself would push the same question one screen
+                // further away rather than answering it.
+                if (state.location.isAuthorized) {
+                    PrimaryActionButton(
+                        title = loc.t("care.nearby.search"),
+                        icon = DwIcons.myLocation,
+                        onClick = onSearchNearby,
+                    )
+                } else {
+                    LocationPermissionCard(
+                        denied = deniedLocation,
+                        onAllow = onRequestLocation,
+                    )
+                }
             }
         }
 
@@ -147,11 +190,19 @@ fun CareScreen(
             CardSection(
                 title = loc.t("care.dghs.title"),
                 subtitle = loc.t("care.dghs.subtitle"),
-                modifier = Modifier.padding(horizontal = Space.card),
+                modifier = Modifier.padding(horizontal = Space.screen),
             ) {
                 Box {
                     Row(
                         Modifier
+                            // Pulled back by its own padding so the filter's
+                            // icon starts on the same left edge as the card's
+                            // title and the hospital names below it. The padding
+                            // stays — it is what gives the control a tap target
+                            // and a ripple wider than the words — but without
+                            // the offset it alone sat 6dp in from everything
+                            // else in the card.
+                            .offset(x = (-6).dp)
                             .clip(Shapes.chip)
                             .clickable(role = Role.Button) { filterExpanded = true }
                             .padding(horizontal = 6.dp, vertical = 6.dp),

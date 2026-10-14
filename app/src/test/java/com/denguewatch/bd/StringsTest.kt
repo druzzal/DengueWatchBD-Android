@@ -10,6 +10,7 @@ import com.denguewatch.bd.i18n.Strings
 import com.denguewatch.bd.i18n.guidanceKey
 import com.denguewatch.bd.i18n.labelKey
 import com.denguewatch.bd.model.RiskLevel
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -43,23 +44,60 @@ class StringsTest {
 
     @Test
     fun `both tables agree on how many arguments each string takes`() {
-        // A Bengali string with a different number of %s slots than its English
+        // A Bengali string with a different number of slots than its English
         // twin throws at format time, in whichever screen happens to use it.
-        val slot = Regex("%[sd]")
+        //
+        // Counts distinct arguments, not slot characters: a translation that
+        // reorders the facts numbers its slots (`%1${'$'}s`, `%2${'$'}s`), and
+        // counting those as plain `%s` would read two arguments as none.
         Strings.english.forEach { (key, english) ->
             val bangla = Strings.bangla[key] ?: return@forEach
             assertEquals(
                 "argument count differs for '$key'",
-                slot.findAll(english).count(),
-                slot.findAll(bangla).count(),
+                argumentCount(english),
+                argumentCount(bangla),
             )
         }
     }
 
     @Test
+    fun `a reordered translation still says which number is which`() {
+        // Bengali counts the other way round — "out of five, two are done" —
+        // so its slots are numbered. Unnumbered, the same arguments rendered
+        // "5 of 2 done" to every Bengali reader while the English was right.
+        val rendered = String.format(
+            Locale.ENGLISH,
+            Strings.bangla.getValue("checklist.progress"),
+            "2",
+            "5",
+        )
+        val beforeOutOf = rendered.substringBefore("মধ্যে")
+        val afterOutOf = rendered.substringAfter("মধ্যে")
+        assertTrue("the total belongs first in Bengali: $rendered", beforeOutOf.contains("5"))
+        assertTrue("the done count belongs second in Bengali: $rendered", afterOutOf.contains("2"))
+    }
+
+    /** How many distinct arguments a template consumes, numbered or not. */
+    private fun argumentCount(template: String): Int {
+        val numbered = Regex("""%(\d+)[$]s""")
+            .findAll(template)
+            .map { it.groupValues[1] }
+            .toSet()
+        return if (numbered.isNotEmpty()) numbered.size else Regex("%[sd]").findAll(template).count()
+    }
+
+    @Test
     fun `no string is left empty`() {
+        // One key is deliberately blank in both tables, here and in the iOS
+        // build it came from. Temperature is shown in °C or °F depending on
+        // what the reader chose, so the unit is resolved from that preference
+        // at the point of display. Putting either symbol in the table would
+        // show the wrong one to whoever picked the other.
+        val intentionallyBlank = setOf("vital.unit.temperature")
+
         listOf(Strings.english, Strings.bangla).forEach { table ->
             table.forEach { (key, value) ->
+                if (key in intentionallyBlank) return@forEach
                 assertTrue("'$key' is empty", value.isNotBlank())
             }
         }
@@ -213,6 +251,18 @@ class StringsTest {
         assertEquals("১.০ লাখ", bn.compact(101_000))
         assertEquals("৪১ হাজার", bn.compact(41_032))
         assertEquals("১.২ কোটি", bn.compact(12_000_000))
+
+        // Below ten thousand both languages keep a decimal. Rounding to whole
+        // thousands here labelled a chart tick of 2,500 as "৩ হাজার" — three
+        // thousand — and made the uneven ticks 2,500 / 1,875 / 1,250 read as an
+        // even ৩ / ২ / ১ হাজার axis. Found on a Bengali screen, not in a test.
+        assertEquals("2.5k", en.compact(2_500))
+        assertEquals("২.৫ হাজার", bn.compact(2_500))
+        assertEquals("১.৯ হাজার", bn.compact(1_875))
+        assertEquals("১.৩ হাজার", bn.compact(1_250))
+        // Ten thousand and up drops the decimal in both.
+        assertEquals("13k", en.compact(12_596))
+        assertEquals("১৩ হাজার", bn.compact(12_596))
     }
 
     @Test

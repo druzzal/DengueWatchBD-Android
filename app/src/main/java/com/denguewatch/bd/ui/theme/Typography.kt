@@ -3,6 +3,7 @@ package com.denguewatch.bd.ui.theme
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -40,17 +41,24 @@ enum class Typo {
     STAT_VALUE,
     STAT_UNIT;
 
+    /**
+     * The iOS text styles at the default Dynamic Type size, which is what the
+     * iOS build resolves each of these to: largeTitle 34, title 28, title3 20,
+     * headline 17, body 17, callout 16, subheadline 15, footnote 13, caption 12.
+     * Title, stat value, body and callout had been set a point or more smaller,
+     * so a tile's figure read 24 here against 28 on the iPhone.
+     */
     val size get() = when (this) {
         HERO -> 34.sp
-        TITLE -> 24.sp
+        TITLE -> 28.sp
         SECTION_TITLE -> 20.sp
         HEADLINE -> 17.sp
-        BODY -> 16.sp
-        CALLOUT -> 15.sp
+        BODY -> 17.sp
+        CALLOUT -> 16.sp
         SUBHEADLINE -> 15.sp
         CAPTION -> 13.sp
         MICRO -> 12.sp
-        STAT_VALUE -> 24.sp
+        STAT_VALUE -> 28.sp
         STAT_UNIT -> 13.sp
     }
 
@@ -61,12 +69,16 @@ enum class Typo {
         BODY, CALLOUT, CAPTION, MICRO -> FontWeight.Normal
     }
 
-    /** Tighter tracking on large text, looser on small — the usual optical fix. */
+    /**
+     * Tighter tracking on large text, looser on small — the usual optical fix.
+     * iOS's values in points (−0.8, −0.4, −0.2, +0.2) as a share of each size.
+     */
     val tracking get() = when (this) {
-        HERO -> (-0.025).em
-        TITLE, STAT_VALUE -> (-0.017).em
-        SECTION_TITLE, HEADLINE -> (-0.01).em
-        MICRO -> 0.015.em
+        HERO -> (-0.8 / 34).em
+        TITLE, STAT_VALUE -> (-0.4 / 28).em
+        SECTION_TITLE -> (-0.2 / 20).em
+        HEADLINE -> (-0.2 / 17).em
+        MICRO -> (0.2 / 12).em
         else -> 0.em
     }
 
@@ -97,6 +109,42 @@ enum class Typo {
 }
 
 /**
+ * How much the type scale is multiplied by on this screen.
+ *
+ * The sizes in [Typo] are the iOS ones, which are drawn for a standard 390pt
+ * iPhone. A narrower phone takes them down in proportion, so a 360dp screen is
+ * not left fitting iPhone-sized type into less room; a tablet takes them up a
+ * little, so a 10-inch screen does not read like a phone held at arm's length.
+ * Both ends are capped — text shrunk below 85% stops being comfortable to
+ * read, and past 115% the extra width is better spent as margin (see
+ * [Layout.readableWidth]) than as ever-larger letters.
+ *
+ * Keyed on the screen's shorter side, so turning a phone sideways does not
+ * make every word jump in size. It multiplies the reader's own font-size
+ * setting rather than replacing it: `sp` already carries that.
+ */
+object TypeScale {
+    /** The width the iOS sizes are drawn for. */
+    const val REFERENCE_WIDTH_DP = 390f
+
+    /** Where the upward scaling reaches its cap: a large tablet. */
+    const val LARGE_WIDTH_DP = 840f
+
+    const val MIN = 0.85f
+    const val MAX = 1.15f
+
+    fun forSmallestWidth(smallestWidthDp: Int): Float = when {
+        smallestWidthDp <= 0 -> 1f
+        smallestWidthDp < REFERENCE_WIDTH_DP -> (smallestWidthDp / REFERENCE_WIDTH_DP).coerceAtLeast(MIN)
+        else -> (1f + (smallestWidthDp - REFERENCE_WIDTH_DP) / (LARGE_WIDTH_DP - REFERENCE_WIDTH_DP) * (MAX - 1f))
+            .coerceAtMost(MAX)
+    }
+}
+
+/** The [TypeScale] for the current screen, provided by the theme. */
+val LocalTypeScale = compositionLocalOf { 1f }
+
+/**
  * Apply an app type style. Prefer this over building a [TextStyle] by hand so
  * Bengali gets its own leading and everything scales with the system font size.
  */
@@ -104,8 +152,9 @@ enum class Typo {
 @ReadOnlyComposable
 fun typo(style: Typo, weight: FontWeight? = null): TextStyle {
     val language = LocalLanguage.current
+    val scale = LocalTypeScale.current
     return LocalTextStyle.current.copy(
-        fontSize = style.size,
+        fontSize = (style.size.value * scale).sp,
         fontWeight = weight ?: style.weight,
         // Latin only. The tracking values here are an optical correction for
         // Latin letterforms, and the negative ones measure Bengali short: the
@@ -114,7 +163,7 @@ fun typo(style: Typo, weight: FontWeight? = null): TextStyle {
         // That is how "মাঝারি" rendered as "মাঝা" on the hero card. Bengali
         // needs no tracking correction anyway — it is shaped, not spaced.
         letterSpacing = if (language == AppLanguage.BANGLA) 0.em else style.tracking,
-        lineHeight = style.lineHeight(language),
+        lineHeight = (style.lineHeight(language).value * scale).sp,
         fontFamily = FontFamily.Default,
     )
 }

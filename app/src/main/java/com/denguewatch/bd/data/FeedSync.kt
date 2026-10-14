@@ -124,14 +124,12 @@ class FeedSync(
             return
         }
 
-        // The throttle asks two questions, not one. Elapsed time alone would
-        // skip a sync even when the cache had gone missing, leaving the app
-        // quietly serving the bundled seed despite a working connection. A skip
-        // is only safe when there is actually a cached payload to fall back on.
         val last = lastSuccessfulSync
-        if (!force && last != null &&
-            System.currentTimeMillis() - last < FeedConfig.MINIMUM_SYNC_INTERVAL_MILLIS &&
-            bundled.isServingDownloadedData
+        if (!shouldProbe(
+                force = force,
+                lastSuccess = last,
+                hasCachedPayload = bundled.isServingDownloadedData,
+            ) && last != null
         ) {
             status = Status.UpToDate(last)
             return
@@ -181,7 +179,41 @@ class FeedSync(
         prefs.edit().putLong(LAST_SYNC_KEY, now).apply()
     }
 
-    private companion object {
-        const val LAST_SYNC_KEY = "feed.lastSuccessfulSync"
+    companion object {
+        private const val LAST_SYNC_KEY = "feed.lastSuccessfulSync"
+
+        /**
+         * Whether this call should talk to the server at all.
+         *
+         * Pure, and separate from [sync], so the policy can be tested without
+         * standing up a network: this decision is the difference between a
+         * reader seeing today's figures and yesterday's.
+         *
+         * What it gates is the 350-byte probe. The full document has its own
+         * gate — it is downloaded only when the probe reports a report date
+         * newer than the one on screen — so saying yes here is nearly free.
+         *
+         * Two questions, not one. Elapsed time alone would skip a check even
+         * when the cache had gone missing, leaving the app quietly serving the
+         * bundled seed despite a working connection. A skip is only safe when
+         * there is actually a cached payload to fall back on.
+         */
+        fun shouldProbe(
+            force: Boolean,
+            lastSuccess: Long?,
+            hasCachedPayload: Boolean,
+            now: Long = System.currentTimeMillis(),
+        ): Boolean {
+            if (force) return true
+            if (lastSuccess == null || !hasCachedPayload) return true
+            val elapsed = now - lastSuccess
+            // A stored time in the future means the clock moved backwards — a
+            // manual change, a timezone correction on a phone that had drifted.
+            // Comparing against it would hold the check off until the clock
+            // caught up, which could be a day, and the reader would have no way
+            // to tell why the figures had stopped moving.
+            if (elapsed < 0) return true
+            return elapsed >= FeedConfig.MINIMUM_PROBE_INTERVAL_MILLIS
+        }
     }
 }

@@ -4,13 +4,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.denguewatch.bd.model.AgeBand
+import com.denguewatch.bd.model.AgeBands
 import com.denguewatch.bd.model.Area
+import com.denguewatch.bd.model.NationalSnapshot
 import com.denguewatch.bd.model.DailyPoint
 import com.denguewatch.bd.model.FeedChart
 import com.denguewatch.bd.model.FeedChartID
 import com.denguewatch.bd.model.FeedDocument
 import com.denguewatch.bd.model.FeedHeadline
 import com.denguewatch.bd.model.Division
+import com.denguewatch.bd.model.EpiWeek
 import com.denguewatch.bd.model.Geography
 import com.denguewatch.bd.model.RiskLevel
 import com.denguewatch.bd.model.Series
@@ -122,7 +125,11 @@ class DengueStore(private val bundled: BundledFeedService) {
         headline = document.summary
 
         national = dailySeries(document)
-        epiWeeks = document.chart(FeedChartID.DIVISION_CASES_BY_WEEK)?.categories ?: emptyList()
+        // Only finished weeks: the one in progress would read as a collapse in
+        // every area. `areas` trims each series to this length.
+        val weeks = document.chart(FeedChartID.DIVISION_CASES_BY_WEEK)?.categories ?: emptyList()
+        val reportDay = national.lastOrNull()?.dateMillis ?: document.meta.lastUpdated?.let(FeedDate::iso)
+        epiWeeks = weeks.take(EpiWeek.completeCount(weeks, reportDay))
         areas = areas(document, epiWeeks.size)
         history = history(document)
         ageBandsCases = ageBands(document, "affected cases from 1 January")
@@ -204,7 +211,7 @@ class DengueStore(private val bundled: BundledFeedService) {
             } else {
                 weekly?.series(definition.weeklySeriesName)?.values ?: emptyList()
             }
-            if (weekCount > 0 && series.size > weekCount) series = series.take(weekCount)
+            if (series.size > weekCount) series = series.take(weekCount)
 
             Area(
                 code = definition.code,
@@ -249,29 +256,22 @@ class DengueStore(private val bundled: BundledFeedService) {
             (it.title ?: "").contains(titleFragment, ignoreCase = true)
         } ?: return emptyList()
 
-        return table.rows.mapNotNull { row ->
+        val rows = table.rows.mapNotNull { row ->
             val label = row["Age Group"]?.text ?: return@mapNotNull null
-            if (!isAgeBand(label)) return@mapNotNull null
+            val male = row["Male"]?.number ?: 0
+            val female = row["Female"]?.number ?: 0
             AgeBand(
                 label = label,
-                male = row["Male"]?.number ?: 0,
-                female = row["Female"]?.number ?: 0,
+                male = male,
+                female = female,
+                // DGHS's own Total, which counts cases it recorded no sex for.
+                // Falling back to the sum only when the column is missing.
+                total = row["Total"]?.number ?: (male + female),
             )
         }
-    }
-
-    /**
-     * DGHS's age tables occasionally carry a row where a date was typed into
-     * the age column ("42309" — an Excel serial) or left blank. Those are
-     * dropped rather than rendered as an age band.
-     */
-    private fun isAgeBand(label: String): Boolean {
-        if (label == "80+") return true
-        val parts = label.split("-")
-        if (parts.size != 2) return false
-        val low = parts[0].toIntOrNull() ?: return false
-        val high = parts[1].toIntOrNull() ?: return false
-        return low <= high && high <= 120
+        // The published table repeats bands, overlays coarser ones on finer
+        // ones, and is not in age order. See AgeBands.
+        return AgeBands.normalise(rows)
     }
 
     private fun sexSplit(chart: FeedChart?): SexSplit? {
@@ -297,10 +297,20 @@ class DengueStore(private val bundled: BundledFeedService) {
             return FeedDate.iso(iso) ?: national.lastOrNull()?.dateMillis
         }
 
+    /**
+     * How many calendar days old the newest report is, in the reader's own
+     * calendar. Counted in whole 24-hour blocks from the report date's UTC
+     * midnight — six in the morning in Dhaka — this read one day short every
+     * night: a report of 11 October was "3 days old" at four in the morning of
+     * the 15th.
+     */
     val dataAgeInDays: Int?
         get() {
             val updated = lastUpdated ?: return null
-            return ((System.currentTimeMillis() - updated) / 86_400_000L).toInt()
+            val reportDay = java.time.Instant.ofEpochMilli(updated)
+                .atZone(java.time.ZoneOffset.UTC).toLocalDate()
+            return java.time.temporal.ChronoUnit.DAYS
+                .between(reportDay, java.time.LocalDate.now()).toInt().coerceAtLeast(0)
         }
 
     enum class DataFreshness { FRESH, STALE, OUTDATED }
@@ -334,8 +344,12 @@ class DengueStore(private val bundled: BundledFeedService) {
     val seasonCases: Int get() = headline?.ytdCases ?: national.sumOf { it.cases }
     val seasonDeaths: Int get() = headline?.ytdDeaths ?: national.sumOf { it.deaths }
 
-    val cases24h: Int get() = headline?.last24Cases ?: national.lastOrNull()?.cases ?: 0
-    val deaths24h: Int get() = headline?.last24Deaths ?: national.lastOrNull()?.deaths ?: 0
+    /**
+     * The home screen's figures, each one nullable so a figure the feed never
+     * carried is not drawn as a zero. See [NationalSnapshot].
+     */
+    val snapshot: NationalSnapshot
+        get() = NationalSnapshot.from(headline = headline, national = national, areas = areas)
 
     val last7Cases: Int get() = national.takeLast(7).sumOf { it.cases }
     val previous7Cases: Int get() = national.dropLast(7).takeLast(7).sumOf { it.cases }

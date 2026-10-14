@@ -13,18 +13,22 @@ import com.denguewatch.bd.data.AreaEntryWatch
 import com.denguewatch.bd.data.BackgroundRefresh
 import com.denguewatch.bd.data.BundledFeedService
 import com.denguewatch.bd.data.CaseLogStore
+import com.denguewatch.bd.data.LabStore
+import com.denguewatch.bd.data.VitalsStore
 import com.denguewatch.bd.data.DengueStore
 import com.denguewatch.bd.data.FeedSync
 import com.denguewatch.bd.data.Geofencing
 import com.denguewatch.bd.data.Notifications
 import com.denguewatch.bd.data.LocationManager
 import com.denguewatch.bd.data.Preferences
+import com.denguewatch.bd.data.LogNameStore
+import com.denguewatch.bd.data.PreventionChecklistStore
 import com.denguewatch.bd.i18n.Localization
 import kotlinx.coroutines.launch
 
 /** The five tabs, and the icons and titles they carry. */
 enum class Tab {
-    HOME, MAP, CHECK, CARE, PREVENT;
+    HOME, MAP, HEALTH, CARE, PREVENT;
 
     val titleKey: String get() = "tab.${name.lowercase()}"
 }
@@ -43,6 +47,17 @@ class AppState(context: Context) : ViewModel() {
 
     val store = DengueStore(bundled)
     val caseLog = CaseLogStore(context)
+
+    /** Readings the user takes themselves, and what a lab reported back. */
+    val vitals = VitalsStore(context)
+    val labs = LabStore(context)
+
+    /** Today's prevention tasks, cleared whenever the day turns over. */
+    val checklist = PreventionChecklistStore(context)
+
+    /** Names the reader has given individual days of their record. */
+    val logNames = LogNameStore(context)
+
     val preferences = Preferences(context)
     val localization = Localization(context)
     val location = LocationManager(context)

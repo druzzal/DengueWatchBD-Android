@@ -97,6 +97,18 @@ android {
         }
     }
 
+    // Every language in every install. The app switches between English and
+    // Bangla itself, independent of the phone's language, and the date and time
+    // pickers follow it by loading Android's Bangla resources. Play splits an
+    // App Bundle by the phone's languages, so on an English phone those
+    // resources would never be installed and the pickers would fall back to
+    // English inside a Bangla screen.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -125,6 +137,7 @@ dependencies {
     implementation(libs.androidx.fragment)
     implementation(libs.maplibre.android)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.mlkit.text.recognition)
     debugImplementation(libs.androidx.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.org.json)

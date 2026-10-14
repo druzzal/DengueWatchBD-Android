@@ -20,7 +20,7 @@ object Strings {
     val english: Map<String, String> by lazy {
         buildMap {
             putAll(enCommon)
-            listOf(enDashboard, enMap, enCheck, enPrevent, enCare, enAbout, enRedesign)
+            listOf(enDashboard, enMap, enCheck, enPrevent, enCare, enAbout, enRedesign, enHealth)
                 .forEach { putAll(it) }
         }
     }
@@ -28,7 +28,7 @@ object Strings {
     val bangla: Map<String, String> by lazy {
         buildMap {
             putAll(bnCommon)
-            listOf(bnDashboard, bnMap, bnCheck, bnPrevent, bnCare, bnAbout, bnRedesign)
+            listOf(bnDashboard, bnMap, bnCheck, bnPrevent, bnCare, bnAbout, bnRedesign, bnHealth)
                 .forEach { putAll(it) }
         }
     }
@@ -98,7 +98,11 @@ class Localization(context: Context) {
     fun percentChange(value: Double?) = style.percentChange(value)
     fun fullDate(millis: Long) = style.fullDate(millis)
     fun dayMonth(millis: Long) = style.dayMonth(millis)
-    fun dateTime(millis: Long) = style.dateTime(millis)
+    fun reportedDate(millis: Long) = style.reportedDate(millis)
+    fun pickerDate(millis: Long) = style.pickerDate(millis)
+    fun timeOfDay(millis: Long) = style.timeOfDay(millis)
+    fun dayAndTime(millis: Long) =
+        style.dayAndTime(millis, t("common.today"), t("common.yesterday"))
     fun relative(millis: Long) = style.relative(millis)
 
     private companion object {

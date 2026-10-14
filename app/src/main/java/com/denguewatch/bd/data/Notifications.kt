@@ -90,8 +90,14 @@ object Notifications {
         PendingIntent.getActivity(
             context,
             0,
+            // SINGLE_TOP with CLEAR_TOP brings the running activity forward.
+            // CLEAR_TOP alone finishes and recreates it, which threw away a
+            // half-entered reading or symptom check behind the alert.
             Intent(context, MainActivity::class.java)
-                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                .setFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+                ),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
@@ -134,7 +140,7 @@ object Notifications {
         // rather than as a rate followed by a separate sentence. BigTextStyle
         // honours the break, so the two stay apart in the shade.
         val body = loc.t(
-            "dash.home.detail",
+            "dash.area.detail",
             loc.num(area.lastWeekCases),
             loc.decimal(area.incidencePer100k),
         ) + "\n" + loc.t(area.risk.guidanceKey)

@@ -55,6 +55,23 @@ fun Area.displayName(language: AppLanguage): String =
 fun Division.displayName(language: AppLanguage): String =
     PlaceNames.division(this, language)
 
+/**
+ * The division to print beside an area's name, or null to print none.
+ *
+ * The label exists to disambiguate — "Khulna" the area sits in "Khulna" the
+ * division, and "Cox's Bazar" needs telling that it is in Chattogram. It earns
+ * its place only when it adds something, and when it does not it takes width
+ * the name needed: "Dhaka (outside city)" was being shown beside a second
+ * "Dhaka" squeezed so thin it broke across two lines as "Dhak / a".
+ *
+ * Containment rather than equality is the whole point. All three Dhaka areas
+ * carry their division inside their own name — "Dhaka (outside city)", "Dhaka
+ * North City", "Dhaka South City" — so an equality test calls them different
+ * and prints the division anyway. Ported from the iOS rule.
+ */
+fun divisionLabel(areaName: String, divisionName: String): String? =
+    if (areaName.contains(divisionName, ignoreCase = true)) null else divisionName
+
 // MARK: - Risk copy keys
 //
 // The band carries no strings of its own; it names the keys the tables answer.
