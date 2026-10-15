@@ -105,6 +105,8 @@ internal fun MeasureRow(
     reading: MeasureInput.Reading,
     unitWidth: androidx.compose.ui.unit.Dp = 48.dp,
     invalidDetail: String?,
+    /** A quiet line under the label — the temperature in the other scale. */
+    note: String? = null,
 ) {
     val loc = LocalLocalization.current
     val colors = Dw.colors
@@ -146,6 +148,13 @@ internal fun MeasureRow(
                 style = typo(Typo.MICRO),
                 color = colors.secondaryText,
                 modifier = Modifier.padding(start = Space.tight).width(unitWidth),
+            )
+        }
+        if (note != null) {
+            Text(
+                note,
+                style = typo(Typo.CAPTION).tabularFigures(),
+                color = colors.secondaryText,
             )
         }
         if (invalidDetail != null) {
