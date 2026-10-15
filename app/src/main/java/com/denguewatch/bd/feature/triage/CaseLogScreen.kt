@@ -1,9 +1,6 @@
 package com.denguewatch.bd.feature.triage
 
-import android.content.ClipData
-import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +51,7 @@ import com.denguewatch.bd.i18n.LocalLocalization
 import com.denguewatch.bd.model.HealthLog
 import com.denguewatch.bd.model.HealthLogDay
 import com.denguewatch.bd.model.MeasureStatus
+import com.denguewatch.bd.model.TemperatureUnit
 import com.denguewatch.bd.model.VitalKind
 import com.denguewatch.bd.ui.theme.Card
 import com.denguewatch.bd.ui.theme.Dw
@@ -94,17 +93,10 @@ fun CaseLogScreen(
     // The log is always ordered by date; this only decides which end the reader
     // starts from. Persisted, so the choice survives leaving the screen.
     val oldestFirst = state.preferences.logOldestFirst
-    var editing by remember { mutableStateOf(false) }
-    // Keyed by the day itself: the list is rebuilt from the stores on every
-    // change, so holding the day objects would go stale the moment one record
-    // in a day is removed.
-    var selection by remember { mutableStateOf(emptySet<Long>()) }
+    val scope = rememberCoroutineScope()
     var confirmingDelete by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<Long?>(null) }
     var confirmingDay by remember { mutableStateOf<Long?>(null) }
-    /// Deleting the ticked days asked nothing, while deleting one by swipe
-    /// asked — so the gesture that removes more records was the easier one.
-    var confirmingSelection by remember { mutableStateOf(false) }
 
     val ordered = HealthLog.days(state.vitals.entries, state.labs.reports)
     val days = if (oldestFirst) ordered.reversed() else ordered
@@ -123,7 +115,6 @@ fun CaseLogScreen(
         // A name must not outlive the day it belonged to, or tomorrow's records
         // would inherit it.
         state.logNames.forget(day.dateMillis)
-        selection = selection - day.dateMillis
     }
 
     if (days.isEmpty()) {
@@ -144,36 +135,10 @@ fun CaseLogScreen(
         verticalArrangement = Arrangement.spacedBy(Space.stack),
     ) {
         item {
+            // The whole log is shared from the top bar, as on iOS.
             LogToolbar(
                 oldestFirst = oldestFirst,
                 onSort = { state.preferences.logOldestFirst = it },
-                editing = editing,
-                onToggleEditing = {
-                    editing = !editing
-                    if (!editing) selection = emptySet()
-                },
-                onExport = {
-                    // Built here, then handed to whatever the reader shares
-                    // with. The file lives in the app's own cache, which is the
-                    // only place its FileProvider will share from.
-                    val file = HealthLogPdf.write(context, ordered, loc, state.preferences.temperatureUnit)
-                    val uri = FileProvider.getUriForFile(
-                        context, context.packageName + ".fileprovider", file
-                    )
-                    context.startActivity(
-                        Intent.createChooser(
-                            Intent(Intent.ACTION_SEND).apply {
-                                type = "application/pdf"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                // So the share sheet can show the file it is
-                                // sending, not an unlabelled attachment.
-                                clipData = ClipData.newRawUri(file.name, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            },
-                            loc.t("log.export"),
-                        )
-                    )
-                },
                 modifier = Modifier.padding(horizontal = Space.screen),
             )
         }
@@ -217,39 +182,17 @@ fun CaseLogScreen(
                     LogDayRow(
                         day = day,
                         title = title(day),
-                        editing = editing,
-                        selected = day.dateMillis in selection,
-                        onToggleSelected = {
-                            selection = if (day.dateMillis in selection) {
-                                selection - day.dateMillis
-                            } else {
-                                selection + day.dateMillis
-                            }
-                        },
+                        unit = state.preferences.temperatureUnit,
                         onOpen = { onOpenDay(day.dateMillis) },
+                        onExport = {
+                            HealthLogExport.launch(
+                                scope, context, loc, HealthLogExport.request(state, day.dateMillis),
+                            )
+                        },
                         onRename = { renaming = day.dateMillis },
                         onDelete = { confirmingDay = day.dateMillis },
                     )
                 }
-            }
-        }
-
-        if (editing) {
-            item {
-                SecondaryActionButton(
-                    title = if (selection.isEmpty()) {
-                        loc.t("common.delete")
-                    } else {
-                        loc.t("log.delete.selected", loc.num(selection.size))
-                    },
-                    icon = DwIcons.delete,
-                    tint = colors.riskTint(MeasureStatus.FAR_OUTSIDE.risk),
-                    onClick = {
-                        if (selection.isEmpty()) return@SecondaryActionButton
-                        confirmingSelection = true
-                    },
-                    modifier = Modifier.padding(horizontal = Space.screen),
-                )
             }
         }
 
@@ -314,31 +257,6 @@ fun CaseLogScreen(
         )
     }
 
-    if (confirmingSelection) {
-        AlertDialog(
-            onDismissRequest = { confirmingSelection = false },
-            title = {
-                Text(
-                    loc.t("log.delete.days", loc.num(selection.size)),
-                    style = typo(Typo.HEADLINE),
-                )
-            },
-            text = { Text(loc.t("log.delete.detail")) },
-            confirmButton = {
-                TextButton(onClick = {
-                    days.filter { it.dateMillis in selection }.forEach(::deleteDay)
-                    selection = emptySet()
-                    confirmingSelection = false
-                }) { Text(loc.t("common.delete")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmingSelection = false }) {
-                    Text(loc.t("common.cancel"))
-                }
-            },
-        )
-    }
-
     renaming?.let { dayMillis ->
         RenameDialog(
             initial = state.logNames.name(dayMillis).orEmpty(),
@@ -351,14 +269,11 @@ fun CaseLogScreen(
     }
 }
 
-/** Which end to read from, and whether rows are being picked for deletion. */
+/** Which end to read from. */
 @Composable
 private fun LogToolbar(
     oldestFirst: Boolean,
     onSort: (Boolean) -> Unit,
-    editing: Boolean,
-    onToggleEditing: () -> Unit,
-    onExport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val loc = LocalLocalization.current
@@ -411,28 +326,6 @@ private fun LogToolbar(
                 }
             }
         }
-
-        Spacer(Modifier.weight(1f))
-
-        Text(
-            loc.t("log.export"),
-            style = typo(Typo.CAPTION, FontWeight.SemiBold),
-            color = colors.accent,
-            modifier = Modifier
-                .clip(Shapes.chip)
-                .clickable(role = Role.Button, onClick = onExport)
-                .padding(horizontal = Space.tight, vertical = 6.dp),
-        )
-
-        Text(
-            loc.t(if (editing) "common.done" else "common.edit"),
-            style = typo(Typo.CAPTION, FontWeight.SemiBold),
-            color = colors.accent,
-            modifier = Modifier
-                .clip(Shapes.chip)
-                .clickable(role = Role.Button, onClick = onToggleEditing)
-                .padding(horizontal = Space.tight, vertical = 6.dp),
-        )
     }
 }
 
@@ -447,10 +340,9 @@ private fun LogToolbar(
 private fun LogDayRow(
     day: HealthLogDay,
     title: String,
-    editing: Boolean,
-    selected: Boolean,
-    onToggleSelected: () -> Unit,
+    unit: TemperatureUnit,
     onOpen: () -> Unit,
+    onExport: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -463,7 +355,8 @@ private fun LogDayRow(
     var menu by remember { mutableStateOf(false) }
 
     val figures = buildList {
-        day.peakTemperature?.let { add(loc.decimal(it, 1) + "°C") }
+        // Stored in Celsius; shown in the unit the reader uses everywhere else.
+        day.peakTemperature?.let { add(loc.decimal(unit.fromCelsius(it), 1) + unit.symbol) }
         day.latestBloodPressure?.let { (s, d) -> add("${loc.num(s)}/${loc.num(d)}") }
         day.lowestPlatelets?.let { add("${loc.t("lab.platelets")} ${loc.num(it.toInt())}") }
     }.joinToString(" · ")
@@ -472,7 +365,7 @@ private fun LogDayRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable(role = Role.Button) { if (editing) onToggleSelected() else onOpen() }
+                .clickable(role = Role.Button, onClick = onOpen)
                 .padding(vertical = Space.tight)
                 .semantics {
                     contentDescription = listOf(
@@ -485,22 +378,13 @@ private fun LogDayRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.row),
         ) {
-            if (editing) {
-                Icon(
-                    if (selected) DwIcons.upToDate else DwIcons.circleOutline,
-                    contentDescription = null,
-                    tint = if (selected) colors.accent else colors.tertiaryText,
-                    modifier = Modifier.size(22.dp),
-                )
-            } else {
-                Spacer(
-                    Modifier
-                        .width(3.dp)
-                        .height(34.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(accent)
-                )
-            }
+            Spacer(
+                Modifier
+                    .width(3.dp)
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(accent)
+            )
 
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, style = typo(Typo.CALLOUT, FontWeight.Medium))
@@ -524,20 +408,29 @@ private fun LogDayRow(
                 color = colors.secondaryText,
             )
 
-            if (!editing) {
-                Icon(
-                    DwIcons.more,
-                    contentDescription = loc.t("log.rename"),
-                    tint = colors.tertiaryText,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(Shapes.chip)
-                        .clickable(role = Role.Button) { menu = true },
-                )
-            }
+            Icon(
+                DwIcons.more,
+                // The menu holds export, rename and delete now, and a screen
+                // reader should hear which day's menu it is opening.
+                contentDescription = loc.t("log.dayOptions", title),
+                tint = colors.tertiaryText,
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(Shapes.chip)
+                    .clickable(role = Role.Button) { menu = true },
+            )
         }
 
         DropdownMenu(menu, onDismissRequest = { menu = false }, containerColor = colors.card) {
+            // One day on its own, as the iOS long-press and swipe offer it.
+            DropdownMenuItem(
+                text = { Text(loc.t("log.exportDay"), style = typo(Typo.SUBHEADLINE)) },
+                leadingIcon = {
+                    Icon(DwIcons.pdf, contentDescription = null, tint = colors.accent,
+                         modifier = Modifier.size(18.dp))
+                },
+                onClick = { menu = false; onExport() },
+            )
             DropdownMenuItem(
                 text = { Text(loc.t("log.rename"), style = typo(Typo.SUBHEADLINE)) },
                 onClick = { menu = false; onRename() },

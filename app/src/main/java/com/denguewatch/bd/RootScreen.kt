@@ -1,5 +1,6 @@
 package com.denguewatch.bd
 
+import com.denguewatch.bd.feature.triage.ExportLogButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -327,6 +328,19 @@ private fun MainScaffold(
                                 minScale = 0.8f,
                             )
                         }
+                    }
+                    // The log as a PDF — all of it from My log, one day from a
+                    // day's own screen — in the bar where iOS puts it.
+                    when (val current = destination) {
+                        Destination.CaseLog -> if (
+                            state.vitals.entries.isNotEmpty() || state.labs.reports.isNotEmpty()
+                        ) {
+                            ExportLogButton(state, dayMillis = null, modifier = Modifier.padding(end = Space.tight))
+                        }
+                        is Destination.LogDay -> ExportLogButton(
+                            state, dayMillis = current.dayMillis, modifier = Modifier.padding(end = Space.tight),
+                        )
+                        else -> Unit
                     }
                     // The area's own figures as a card someone can send on,
                     // in the bar where iOS puts it.

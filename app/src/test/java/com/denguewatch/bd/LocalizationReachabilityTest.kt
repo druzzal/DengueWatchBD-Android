@@ -197,7 +197,6 @@ private val KNOWN_ORPHANS = setOf(
     "check.fever.section", "check.intro", "check.risk.section", "check.seeResult",
     "guidance.care", "guidance.check", "guidance.prevent", "guidance.title",
     "result.addToLog", "result.keptOnPhone", "result.saveEntry", "result.temperature",
-    "log.pdf.noSymptoms", "log.pdf.symptoms",
     "tab.check", "tab.overview", "step.skip", "geo.prompt.enabled",
     "temp.outOfRange", "vital.outsideUsual", "vital.usualRange",
     "lab.outsideTypical", "lab.typicalRange", "who.plan.subtitle",

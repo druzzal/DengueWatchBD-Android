@@ -73,6 +73,14 @@ class AppState(context: Context) : ViewModel() {
     var openedAreaCode: String? by mutableStateOf(null)
 
     private var hasStarted = false
+    /**
+     * True once launch has loaded the figures on disk and checked for newer
+     * ones. Until then a resume does not check: on a cold start `onResume`
+     * fires while the store is still empty, so its check could not see that
+     * today's report was already here and downloaded the whole feed again —
+     * forty kilobytes on every launch, on a metered connection.
+     */
+    private var hasSyncedOnce = false
 
     fun start() {
         if (hasStarted) return
@@ -85,6 +93,7 @@ class AppState(context: Context) : ViewModel() {
             store.load()
             sync.start(store, viewModelScope)
             sync.sync(force = false)
+            hasSyncedOnce = true
             // The feed has landed, so the hotspot list and the home-area reading
             // are both real now. Anything depending on them is applied here
             // rather than at construction, when the store was still empty.
@@ -110,7 +119,7 @@ class AppState(context: Context) : ViewModel() {
     /** Called when the app comes back to the front. */
     fun onResume() {
         viewModelScope.launch {
-            sync.sync(force = false)
+            if (hasSyncedOnce) sync.sync(force = false)
             applyAlertSettings()
             // Coming back to the app is a cheap chance to notice the reader has
             // moved, without waiting for the worker's next turn.

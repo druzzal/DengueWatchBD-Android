@@ -119,6 +119,9 @@ class FeedSync(
 
     /** [force] skips the minimum-interval check — used by pull-to-refresh. */
     suspend fun sync(force: Boolean) {
+        // A check already in flight will land the same figures; a second one
+        // would only fetch them twice.
+        if (status == Status.Syncing) return
         if (!isOnline) {
             status = Status.Offline
             return

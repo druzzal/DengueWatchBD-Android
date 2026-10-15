@@ -1,5 +1,11 @@
 package com.denguewatch.bd.feature.health
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import com.denguewatch.bd.ui.theme.tabularFigures
+import com.denguewatch.bd.ui.theme.typo
+import com.denguewatch.bd.ui.theme.Typo
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material3.Text
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -123,6 +129,19 @@ fun VitalsEntryScreen(
                 modifier = Modifier.padding(horizontal = Space.screen),
             ) {
                 VitalRow(VitalKind.TEMPERATURE, text, unit.symbol, ::reading)
+                // The same reading in the other scale, so a Fahrenheit
+                // thermometer and a Celsius prescription can be read together.
+                reading(VitalKind.TEMPERATURE).storedValue?.let { celsius ->
+                    val other = if (unit == TemperatureUnit.CELSIUS) TemperatureUnit.FAHRENHEIT
+                                else TemperatureUnit.CELSIUS
+                    Text(
+                        "= " + loc.decimal(other.fromCelsius(celsius), 1) + other.symbol,
+                        style = typo(Typo.MICRO).tabularFigures(),
+                        color = colors.secondaryText,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.End,
+                    )
+                }
                 HairlineDivider()
                 SegmentedPicker(
                     options = TemperatureUnit.entries,

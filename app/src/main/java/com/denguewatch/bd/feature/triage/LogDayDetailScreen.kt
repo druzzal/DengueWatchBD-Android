@@ -1,5 +1,9 @@
 package com.denguewatch.bd.feature.triage
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import com.denguewatch.bd.model.side
+import com.denguewatch.bd.model.MeasureSide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -114,14 +118,13 @@ private fun VitalsDetail(entry: VitalsEntry, unit: TemperatureUnit) {
     val systolic = entry.systolic
     val diastolic = entry.diastolic
     if (systolic != null && diastolic != null) {
+        val (side, status) = MeasureSide.bloodPressure(systolic, diastolic)
         MeasureRow(
             label = loc.t("vital.bloodPressure"),
             value = "${loc.num(systolic.toInt())}/${loc.num(diastolic.toInt())}",
             unit = loc.t(VitalKind.SYSTOLIC.unitKey),
-            status = worseOf(
-                VitalKind.SYSTOLIC.status(systolic),
-                VitalKind.DIASTOLIC.status(diastolic),
-            ),
+            status = status,
+            side = side,
         )
     }
 
@@ -139,6 +142,7 @@ private fun VitalsDetail(entry: VitalsEntry, unit: TemperatureUnit) {
             value = loc.decimal(if (isTemperature) unit.fromCelsius(value) else value, kind.decimals),
             unit = if (isTemperature) unit.symbol else loc.t(kind.unitKey),
             status = kind.status(value),
+            side = kind.side(value),
         )
     }
 
@@ -161,6 +165,7 @@ private fun LabDetail(report: LabReport) {
             value = loc.decimal(value, measure.decimals),
             unit = loc.t(measure.unitKey),
             status = measure.status(value),
+            side = measure.side(value),
         )
     }
 
@@ -194,10 +199,14 @@ private fun Header(title: String, time: String) {
 }
 
 /**
- * One reading: what it is, what it was, and whether that is usual.
+ * One reading: what it is, what it was, and whether it was low, normal or high.
  *
- * The range is said in words as well as colour — a reader who cannot tell the
- * tints apart still learns that a count is outside its usual range.
+ * Said in words as well as colour, and for every reading rather than only the
+ * ones out of range: a log is read for which way things went — a platelet
+ * count that fell, a fever that rose — and "Outside the usual range" could not
+ * say which. A normal reading's word stays in neutral ink.
+ *
+ * [side] is null for a test result, which has no range to fall either side of.
  */
 @Composable
 private fun MeasureRow(
@@ -205,6 +214,7 @@ private fun MeasureRow(
     value: String,
     unit: String,
     status: MeasureStatus,
+    side: MeasureSide? = null,
     emphasise: Boolean = false,
 ) {
     val loc = LocalLocalization.current
@@ -222,7 +232,19 @@ private fun MeasureRow(
     // the figures' baseline rather than at the top of the taller line.
     val unitStyle = typo(Typo.MICRO)
     val unitWidth = with(LocalDensity.current) { (unitStyle.fontSize * 4.2f).toDp() }
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            if (side != null) {
+                // The grade of how far out goes to the spoken label, so a
+                // screen reader hears "Low, well outside the usual range".
+                contentDescription = listOfNotNull(
+                    label, "$value $unit".trim(), loc.t(side.labelKey),
+                    loc.t(status.labelKey).takeIf { status != MeasureStatus.NORMAL },
+                ).joinToString(", ")
+            }
+        },
+    ) {
         Row(Modifier.fillMaxWidth()) {
             Text(
                 label,
@@ -246,12 +268,12 @@ private fun MeasureRow(
                     .alignByBaseline(),
             )
         }
-        if (status != MeasureStatus.NORMAL) {
-            Text(loc.t(status.labelKey), style = typo(Typo.MICRO), color = ink)
+        if (side != null) {
+            Text(
+                loc.t(side.labelKey),
+                style = typo(Typo.MICRO, FontWeight.SemiBold),
+                color = if (status == MeasureStatus.NORMAL) colors.secondaryText else ink,
+            )
         }
     }
 }
-
-/** The worse of two statuses, for a reading written as a pair. */
-private fun worseOf(a: MeasureStatus, b: MeasureStatus): MeasureStatus =
-    if (b.risk.ordinal > a.risk.ordinal) b else a

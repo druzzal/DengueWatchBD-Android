@@ -202,7 +202,9 @@ private fun LazyListScope.loadedContent(
             DengueRiskCard(
                 risk = focusRisk,
                 areaName = focusAreaName,
-                change = focusArea?.weeklyChange ?: store.weeklyCaseChange,
+                // An area with no prior week has no trend; it must not borrow
+                // the national one under its own name.
+                change = focusArea.let { if (it != null) it.weeklyChange else store.weeklyCaseChange },
                 lastUpdatedMillis = store.lastUpdated,
                 incidence = focusArea?.incidencePer100k ?: nationalIncidence,
                 onClick = {

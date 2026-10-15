@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.Eco
@@ -117,6 +119,10 @@ object DwIcons {
     val delete: ImageVector = Icons.Filled.Delete
     val sort: ImageVector = Icons.Filled.SwapVert
     val more: ImageVector = Icons.Filled.MoreVert
+    // The health log as a document: the platform's own share glyph in the bar,
+    // where iOS has square.and.arrow.up, and a PDF mark for one day's export.
+    val share: ImageVector = Icons.Filled.Share
+    val pdf: ImageVector = Icons.Filled.PictureAsPdf
 
     /** Marks the note saying a record never leaves the phone. */
     val lock: ImageVector = Icons.Filled.Lock
