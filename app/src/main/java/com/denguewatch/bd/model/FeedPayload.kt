@@ -271,6 +271,7 @@ internal fun JSONObject.optStringOrNull(key: String): String? {
 internal fun JSONObject.optIntOrNull(key: String): Int? {
     if (!has(key) || isNull(key)) return null
     return when (val value = opt(key)) {
+        null -> null
         is Int -> value
         is Long -> value.toInt()
         is Double -> Math.round(value).toInt()

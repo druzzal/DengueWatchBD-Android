@@ -332,7 +332,7 @@ private fun MainScaffold(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = colors.plane,
                     titleContentColor = colors.primaryText,
                     actionIconContentColor = colors.accent,

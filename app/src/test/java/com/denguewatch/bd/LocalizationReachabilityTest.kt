@@ -137,7 +137,7 @@ class LocalizationReachabilityTest {
         val root = File("src/main/java/com/denguewatch/bd")
         val found = root.walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
-            .filterNot { it.parentFile.name == "i18n" && it.name.startsWith("Strings") }
+            .filterNot { it.parentFile?.name == "i18n" && it.name.startsWith("Strings") }
             .flatMap { file -> pattern.findAll(file.readText()).map { it.groupValues[1] } }
             .toSet()
         assertFalse("the source tree was not found at ${root.absolutePath}", found.isEmpty())

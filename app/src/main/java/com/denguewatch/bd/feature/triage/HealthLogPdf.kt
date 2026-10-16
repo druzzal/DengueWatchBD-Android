@@ -262,7 +262,7 @@ object HealthLogPdf {
             vitals.lastOrNull { it.systolic != null && it.diastolic != null }?.let { e ->
                 val (side, status) = MeasureSide.bloodPressure(e.systolic!!, e.diastolic!!)
                 add(Tile(loc.t("pdf.glance.latestBP"),
-                         "${loc.num(e.systolic.toInt())}/${loc.num(e.diastolic!!.toInt())}",
+                         "${loc.num(e.systolic.toInt())}/${loc.num(e.diastolic.toInt())}",
                          loc.t("vital.unit.systolic"), side, status, loc.dayMonth(e.dateMillis)))
             }
             vitals.filter { it.oxygenSaturation != null }.minByOrNull { it.oxygenSaturation!! }?.let { e ->
