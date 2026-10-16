@@ -38,14 +38,28 @@ struct Area: Identifiable, Hashable {
     let weeklyIsApportioned: Bool
     /// Roughly half the area's extent, for the entry geofence.
     let geofenceRadiusMeters: Double
+    /// True when the last entry of `weeklyCases` is the EPI week still in
+    /// progress — a Tuesday report carries three days of it.
+    ///
+    /// Read as a whole week, that stub made every area look like it was
+    /// falling for most of the week and banded the fortnight on ten days of
+    /// cases, understating risk exactly when it was being read. The charts
+    /// still draw it; the figures below are judged on complete weeks only.
+    var latestWeekIsPartial = false
 
     var id: String { code }
 
-    var lastWeekCases: Int { weeklyCases.last ?? 0 }
-    var previousWeekCases: Int { weeklyCases.dropLast().last ?? 0 }
+    /// The weekly series up to the last week DGHS has finished reporting.
+    private var completeWeeks: ArraySlice<Int> {
+        latestWeekIsPartial ? weeklyCases.dropLast() : weeklyCases[...]
+    }
 
-    /// Two most recent EPI weeks — the window the risk bands are calibrated for.
-    var recentCases: Int { Series.sum(Array(weeklyCases.suffix(2))) }
+    var lastWeekCases: Int { completeWeeks.last ?? 0 }
+    var previousWeekCases: Int { completeWeeks.dropLast().last ?? 0 }
+
+    /// Two most recent complete EPI weeks — the window the risk bands are
+    /// calibrated for.
+    var recentCases: Int { completeWeeks.suffix(2).reduce(0, +) }
 
     /// Week-on-week change as a fraction, e.g. `0.18` for +18%.
     /// `nil` when the prior week is empty and a ratio would be meaningless.
@@ -63,7 +77,24 @@ struct Area: Identifiable, Hashable {
     var risk: RiskLevel { RiskLevel(incidencePer100k: incidencePer100k) }
 
 
-    func recentWeeks(_ count: Int) -> [Int] { Array(weeklyCases.suffix(count)) }
+    /// The risk band for one reporting week, judged on the same two-week
+    /// window `incidencePer100k` uses.
+    ///
+    /// A week is banded together with the week before it, never on its own.
+    /// The thresholds are calibrated for a fortnight's attack rate, so feeding
+    /// them a single week's count would read roughly half the true rate and
+    /// paint a Severe week as High — quietly understating exactly the weeks
+    /// that matter most. The first week of a series has no predecessor, so it
+    /// is banded on itself and will read low; that is a known floor, not a
+    /// claim about that week.
+    func risk(atWeekIndex index: Int) -> RiskLevel {
+        guard weeklyCases.indices.contains(index), populationThousands > 0 else { return .low }
+        let window = weeklyCases[max(0, index - 1)...index]
+        let incidence = Double(window.reduce(0, +)) / Double(populationThousands) * 100
+        return RiskLevel(incidencePer100k: incidence)
+    }
+
+    func recentWeeks(_ count: Int) -> [Int] { Array(completeWeeks.suffix(count)) }
 }
 
 /// Where each reporting area sits and how many people live there.
@@ -260,13 +291,65 @@ struct YearSummary: Identifiable, Hashable {
 }
 
 /// One age band, split by sex. The feed publishes this for cases and deaths.
+///
+/// Held as a range rather than as the label DGHS printed, because the source
+/// sheet spells the same band two ways ("06-10" and "6-10") and sorts its rows
+/// as text — which puts "6-10" between "56-60" and "61-65". A range can be
+/// merged and ordered; a string can only be shown.
 struct AgeBand: Identifiable, Hashable {
-    let label: String
+    /// Inclusive.
+    let lowerAge: Int
+    /// Inclusive. Nil for the open-ended top band, which DGHS prints as "80+".
+    let upperAge: Int?
     let male: Int
     let female: Int
+    /// The band's total as DGHS published it, which is not always male plus
+    /// female: their table records cases whose sex was never filled in — 244
+    /// of them this season, spread across every band. Deriving the total from
+    /// the two sexes dropped those silently, so each row printed a smaller
+    /// number than the source it came from, and the card as a whole accounted
+    /// for 256 fewer cases than the season figure on the home screen.
+    let total: Int
 
-    var id: String { label }
-    var total: Int { male + female }
+    /// The whole span, not just where it starts.
+    ///
+    /// Keyed on lowerAge alone, "21-25" and "21-30" were the same row to
+    /// SwiftUI: a ForEach given two items with one id draws one of them twice
+    /// and drops the other, which is how the largest band in the table
+    /// disappeared from the card while a one-case row appeared on it twice.
+    /// The rows that collided are filtered out upstream now, but an id has to
+    /// identify the thing rather than rely on the data being clean.
+    var id: String { "\(lowerAge)-\(upperAge.map(String.init) ?? "+")" }
+
+    /// Cases in this band with no sex recorded.
+    ///
+    /// Shown rather than hidden: they are real people in the count, and a bar
+    /// that silently omitted them would make the card disagree with the
+    /// season total the rest of the app reports. Clamped at zero so a source
+    /// whose total is somehow smaller than its parts cannot produce a
+    /// negative width.
+    var unrecordedSex: Int { max(0, total - male - female) }
+
+    /// True when this band covers all of another — "0-10" over "6-10".
+    ///
+    /// Used to spot rows that are not really bands. Consecutive bands that
+    /// merely share an endpoint, as "76-80" and "80+" do in DGHS's own scheme,
+    /// do not span each other and are left alone.
+    func spans(_ other: AgeBand) -> Bool {
+        guard self != other else { return false }
+        let myTop = upperAge ?? Int.max
+        let theirTop = other.upperAge ?? Int.max
+        return lowerAge <= other.lowerAge && theirTop <= myTop
+    }
+
+    /// The band written out, in the reader's digits.
+    ///
+    /// Built here rather than carried from the feed so that Bengali gets
+    /// Bengali numerals — the source only ever publishes Western ones.
+    func label(_ style: NumberStyle) -> String {
+        guard let upperAge else { return "\(style.num(lowerAge))+" }
+        return "\(style.num(lowerAge))–\(style.num(upperAge))"
+    }
 }
 
 struct SexSplit: Hashable {

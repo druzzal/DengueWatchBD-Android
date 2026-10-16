@@ -3,6 +3,10 @@ import SwiftUI
 struct RootView: View {
     @State private var store = DengueStore()
     @State private var caseLog = CaseLogStore()
+    @State private var vitals = VitalsStore()
+    @State private var labs = LabStore()
+    @State private var fluids = FluidStore()
+    @State private var logNames = LogNameStore()
     @State private var preferences = Preferences()
     @State private var localization = LocalizationManager()
     // Owned by the process, not the view — see AppDelegate.
@@ -22,9 +26,9 @@ struct RootView: View {
                 .tabItem { Label(localization.t("tab.map"), systemImage: AppRouter.Tab.map.symbol) }
                 .tag(AppRouter.Tab.map)
 
-            SymptomCheckerView()
-                .tabItem { Label(localization.t("tab.check"), systemImage: AppRouter.Tab.check.symbol) }
-                .tag(AppRouter.Tab.check)
+            MyHealthView()
+                .tabItem { Label(localization.t("tab.health"), systemImage: AppRouter.Tab.health.symbol) }
+                .tag(AppRouter.Tab.health)
 
             CareView()
                 .tabItem { Label(localization.t("tab.care"), systemImage: AppRouter.Tab.care.symbol) }
@@ -37,6 +41,10 @@ struct RootView: View {
         .tint(Palette.accent)
         .environment(store)
         .environment(caseLog)
+        .environment(vitals)
+        .environment(labs)
+        .environment(fluids)
+        .environment(logNames)
         .environment(preferences)
         .environment(localization)
         .environment(location)
@@ -48,6 +56,15 @@ struct RootView: View {
             await sync.sync(force: false)
             configureLocationHandling()
             await evaluateAlerts()
+        }
+        // The digest's text is fixed when it is scheduled, so a reader who
+        // switches language would otherwise keep getting it in the old one.
+        .onChange(of: localization.language) {
+            guard preferences.weeklyDigestEnabled else { return }
+            Task {
+                await NotificationManager.shared.scheduleWeeklyDigest(enabled: true,
+                                                                      localization: localization)
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -71,6 +88,9 @@ struct RootView: View {
             FirstRunDisclaimerView()
                 .environment(preferences)
                 .environment(localization)
+                // A cover is its own presentation context, so the tint set on
+                // the tab view above does not reach it.
+                .tint(Palette.accent)
         }
     }
 

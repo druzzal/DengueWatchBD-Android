@@ -56,16 +56,21 @@ struct AreaDetailView: View {
 
                 CardSection(loc.t("area.chart.title", area.displayName(loc.language)),
                             subtitle: loc.t("area.chart.subtitle")) {
-                    ChartLegend(items: [
-                        .init(label: loc.t("dash.legend.daily"), color: Palette.casesMuted),
-                        .init(label: loc.t("dash.legend.average"), color: Palette.cases, isLine: true)
-                    ])
+                    // Bar height is that week's cases; bar colour is the risk
+                    // band that week sat in. Two encodings of two different
+                    // things — a tall bar in a small population and a short one
+                    // in a large population are not the same situation, and the
+                    // colour is what says so.
+                    ChartLegend(items: RiskLevel.allCases.map {
+                        .init(label: loc.t($0.labelKey), color: $0.tint)
+                    } + [.init(label: loc.t("area.legend.average"),
+                               color: Palette.cases, isLine: true)])
 
                     Chart {
-                        ForEach(weekly) { point in
+                        ForEach(Array(weekly.enumerated()), id: \.element.id) { index, point in
                             BarMark(x: .value("Week", point.week),
                                     y: .value("Cases", point.cases))
-                                .foregroundStyle(Palette.casesMuted)
+                                .foregroundStyle(area.risk(atWeekIndex: index).tint)
                                 .cornerRadius(2)
                         }
                         ForEach(average, id: \.week) { item in
@@ -109,6 +114,23 @@ struct AreaDetailView: View {
         }
         .background(Palette.plane)
         .navigationTitle(area.displayName(loc.language))
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                // Rendered on demand rather than kept in state: the card is a
+                // one-off artefact, and holding a 1080x1350 bitmap alive for a
+                // screen the reader may never share from is wasteful.
+                if let image = AreaShareCard.image(for: area,
+                                                   lastUpdated: store.lastUpdated,
+                                                   loc: loc) {
+                    ShareLink(item: image,
+                              preview: SharePreview(area.displayName(loc.language),
+                                                    image: image)) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel(loc.t("share.button"))
+                }
+            }
+        }
         .navigationBarTitleDisplayMode(.large)
     }
 

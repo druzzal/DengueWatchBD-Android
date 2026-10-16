@@ -61,6 +61,11 @@ fun TriageResultScreen(
     onCall: (String) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    /**
+     * Same-day advice that came from the reader's risk group, not from a
+     * warning sign, takes its own summary.
+     */
+    raisedByRiskGroup: Boolean = false,
 ) {
     val loc = LocalLocalization.current
     val colors = Dw.colors
@@ -122,7 +127,7 @@ fun TriageResultScreen(
                     Text(loc.t(outcome.headlineKey), style = typo(Typo.TITLE))
                 }
                 Text(
-                    loc.t(outcome.summaryKey),
+                    loc.t(if (raisedByRiskGroup) "outcome.seeDoctor.riskGroup.summary" else outcome.summaryKey),
                     style = typo(Typo.CALLOUT),
                     color = colors.secondaryText,
                 )

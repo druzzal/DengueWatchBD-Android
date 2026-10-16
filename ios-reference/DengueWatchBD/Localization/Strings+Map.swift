@@ -2,6 +2,16 @@ import Foundation
 
 extension Strings {
     static let enMap: [String: String] = [
+        // Shareable surveillance card
+        "share.button": "Share this area",
+        "share.appName": "DengueWatch BD",
+        "share.tagline": "Independent app using official DGHS data",
+        "share.unit.incidence": "cases per 100,000\nlast 14 days",
+        "share.unit.season": "reported this season",
+        "share.change": "%@ on last week",
+        "share.source": "Source: DGHS · %@",
+        "share.sourceNoDate": "Source: DGHS",
+
         "area.apportioned.note": "Weekly figures for the Dhaka city corporations are shared out from the Dhaka division series, which is the finest weekly breakdown DGHS publishes. Season cases and deaths are reported for this area directly.",
         "map.title": "Where it is spreading",
         "map.metric.total": "Total cases",
@@ -15,6 +25,7 @@ extension Strings {
         "map.list.divisions": "By division · season cases",
         "map.list.areas": "All reporting areas · season cases",
         "map.list.footer": "Risk is 14-day reported cases per 100,000 residents: under 5 low, 5–20 moderate, 20–60 high, above 60 severe.",
+        "map.youAreHere.a11y": "Your location",
         "map.bubble.a11y": "%@, %@ cases, %@ risk",
         "map.you.inArea": "You are in %@",
         "map.you.enable": "Show my location",
@@ -28,7 +39,7 @@ extension Strings {
         "area.setHome": "Set as my area",
         "area.isHome": "This is your home area",
         "area.stat.season": "Season cases",
-        "area.stat.last7": "Latest week",
+        "area.stat.last7": "Latest full week",
         "area.stat.rate": "Two-week rate",
         "area.stat.deaths": "Season deaths",
         "area.rank": "#%@ of 10 areas",
@@ -36,6 +47,7 @@ extension Strings {
         "area.share": "%@%% of national cases",
         "area.chart.title": "Cases in %@",
         "area.chart.subtitle": "Cases by epidemiological week, with a 3-week average",
+        "area.legend.average": "3-week average",
         "area.peers.title": "Rest of %@ division",
         "area.peers.subtitle": "Season cases in neighbouring areas",
         "area.picker.title": "My area",
@@ -43,6 +55,16 @@ extension Strings {
     ]
 
     static let bnMap: [String: String] = [
+        // শেয়ারযোগ্য কার্ড
+        "share.button": "এই এলাকা শেয়ার করুন",
+        "share.appName": "ডেঙ্গুওয়াচ বিডি",
+        "share.tagline": "স্বাস্থ্য অধিদপ্তরের সরকারি তথ্য ব্যবহারকারী স্বাধীন অ্যাপ",
+        "share.unit.incidence": "প্রতি লাখে রোগী\nগত ১৪ দিনে",
+        "share.unit.season": "এ মৌসুমে শনাক্ত",
+        "share.change": "গত সপ্তাহের তুলনায় %@",
+        "share.source": "উৎস: স্বাস্থ্য অধিদপ্তর · %@",
+        "share.sourceNoDate": "উৎস: স্বাস্থ্য অধিদপ্তর",
+
         "area.apportioned.note": "ঢাকার সিটি করপোরেশনগুলোর সাপ্তাহিক হিসাব ঢাকা বিভাগের সিরিজ থেকে ভাগ করে বের করা — স্বাস্থ্য অধিদপ্তর সাপ্তাহিক হিসাব এর চেয়ে সূক্ষ্মভাবে প্রকাশ করে না। মৌসুমের রোগী ও মৃত্যু সরাসরি এই এলাকার জন্যই জানানো।",
         "map.title": "কোথায় ছড়াচ্ছে",
         "map.metric.total": "মোট রোগী",
@@ -56,6 +78,7 @@ extension Strings {
         "map.list.divisions": "বিভাগ অনুযায়ী · মৌসুমের রোগী",
         "map.list.areas": "সব রিপোর্টিং এলাকা · মৌসুমের রোগী",
         "map.list.footer": "ঝুঁকি হিসাব করা হয় ১৪ দিনে প্রতি লাখ বাসিন্দায় শনাক্ত রোগী দিয়ে: ৫-এর কম কম, ৫–২০ মাঝারি, ২০–৬০ বেশি, ৬০-এর বেশি তীব্র।",
+        "map.youAreHere.a11y": "আপনার অবস্থান",
         "map.bubble.a11y": "%@, %@ জন আক্রান্ত, ঝুঁকি %@",
         "map.you.inArea": "আপনি আছেন %@ এলাকায়",
         "map.you.enable": "আমার অবস্থান দেখান",
@@ -69,7 +92,7 @@ extension Strings {
         "area.setHome": "আমার এলাকা হিসেবে নির্ধারণ করুন",
         "area.isHome": "এটি আপনার নিজের এলাকা",
         "area.stat.season": "মৌসুমের রোগী",
-        "area.stat.last7": "সর্বশেষ সপ্তাহ",
+        "area.stat.last7": "সর্বশেষ পূর্ণ সপ্তাহ",
         "area.stat.rate": "দুই সপ্তাহের হার",
         "area.stat.deaths": "মৌসুমের মৃত্যু",
         "area.rank": "১০ এলাকার মধ্যে %@ নম্বর",
@@ -77,6 +100,7 @@ extension Strings {
         "area.share": "জাতীয় রোগীর %@%%",
         "area.chart.title": "%@ এলাকার রোগী",
         "area.chart.subtitle": "সপ্তাহভিত্তিক রোগী, সঙ্গে ৩ সপ্তাহের গড়",
+        "area.legend.average": "৩ সপ্তাহের গড়",
         "area.peers.title": "%@ বিভাগের অন্যান্য এলাকা",
         "area.peers.subtitle": "পার্শ্ববর্তী এলাকাগুলোতে মৌসুমের রোগী",
         "area.picker.title": "আমার এলাকা",

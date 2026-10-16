@@ -226,6 +226,7 @@ private fun DrawScope.drawMotif(symptomId: String, accent: Color) {
         "nausea" -> nausea(accent)
         "abdominal" -> abdominal(accent)
         "vomiting" -> vomiting(accent)
+        "oralIntolerance" -> oralIntolerance(accent)
         "bleeding" -> bleeding(accent)
         "fatigue" -> fatigue(accent)
         "fluid" -> fluid(accent)
@@ -371,6 +372,32 @@ private fun DrawScope.noUrine(accent: Color) {
         size = Size(s(18f), s(8f)),
     )
     line(24f to 82f, 78f to 20f, accent, 5f)
+}
+
+/**
+ * A mug, full, struck through: the drink that cannot be taken. A mug with a
+ * handle rather than a glass, so it never reads as no-urine's empty glass.
+ */
+private fun DrawScope.oralIntolerance(accent: Color) {
+    val body = Path().apply {
+        moveTo(n(28f, 30f).x, n(28f, 30f).y)
+        lineTo(n(64f, 30f).x, n(64f, 30f).y)
+        lineTo(n(60f, 80f).x, n(60f, 80f).y)
+        lineTo(n(32f, 80f).x, n(32f, 80f).y)
+        close()
+    }
+    drawPath(body, accent.copy(alpha = 0.18f))
+    drawPath(body, accent, style = Stroke(width = s(4.5f)))
+    // The handle.
+    drawArc(
+        accent,
+        startAngle = -90f, sweepAngle = 180f, useCenter = false,
+        topLeft = n(56f, 40f), size = Size(s(20f), s(24f)),
+        style = Stroke(width = s(4f)),
+    )
+    // Full to near the brim: there is drink, it is the drinking that fails.
+    drawRect(accent.copy(alpha = 0.5f), topLeft = n(31f, 38f), size = Size(s(30f), s(6f)))
+    line(22f to 84f, 80f to 22f, accent, 5f)
 }
 
 /** A figure falling, with the ground rushing up. */

@@ -25,6 +25,12 @@ struct AreaMapView: View {
     @State private var searchText = ""
     @State private var showingLocationExplainer = false
     @State private var camera: MapCameraPosition = .region(.bangladesh)
+    /// Bumped on every camera change so the position marker re-reads the
+    /// proxy. Deliberately an object rather than `@State` on this view: with
+    /// Observation, only the view that reads `tick` is invalidated, so a pan
+    /// redraws a marker instead of the whole screen — the bubbles, the legend
+    /// and the footer all stayed out of it.
+    @State private var cameraTicker = CameraTicker()
     @State private var selectedArea: Area?
     @State private var pushedArea: Area?
     /// Auto-zoom happens once per visit to the tab, never again.
@@ -122,7 +128,8 @@ struct AreaMapView: View {
             .padding(.top, 8)
             .padding(.bottom, 8)
 
-            Map(position: $camera, interactionModes: [.pan, .zoom]) {
+            MapReader { proxy in
+                Map(position: $camera, interactionModes: .all) {
                 ForEach(store.areas) { area in
                     Annotation(area.displayName(loc.language),
                                coordinate: CLLocationCoordinate2D(latitude: area.latitude,
@@ -139,10 +146,33 @@ struct AreaMapView: View {
                     .annotationTitles(.hidden)
                 }
 
-                UserAnnotation()
+            }
+            .overlay(alignment: .topLeading) {
+                // The reader's own position, drawn over the map rather than
+                // in it. As map content it sat *under* the case bubbles:
+                // MapKit z-orders annotations north-to-south, so the Dhaka
+                // North bubble — centred a few hundred metres away — covered
+                // it exactly where "am I inside this one?" matters most.
+                // `cameraTick` is what keeps it pinned while the map moves.
+                if let here = location.lastKnownLocation {
+                    YouAreHereOverlay(coordinate: here.coordinate,
+                                      proxy: proxy,
+                                      ticker: cameraTicker,
+                                      label: loc.t("map.youAreHere.a11y"))
+                }
+            }
+            .onMapCameraChange(frequency: .continuous) { _ in
+                // Re-reads the proxy as the camera moves; without it the
+                // marker would stay where the map used to be.
+                cameraTicker.tick &+= 1
             }
             .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
-            .mapControls { MapCompass() }
+            .mapControls {
+                MapCompass()
+                MapScaleView()
+                // Only offered once there is a position to return to.
+                if location.isAuthorized { MapUserLocationButton() }
+            }
             .onAppear {
                 // Only starts if permission is already granted; otherwise the
                 // legend offers the button that asks for it.
@@ -179,6 +209,7 @@ struct AreaMapView: View {
                 .readableColumn()
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
+            }
             }
         }
     }
@@ -271,16 +302,7 @@ struct AreaMapView: View {
             }
             Divider().overlay(Palette.hairline)
         } else if location.lastKnownLocation != nil {
-            HStack(spacing: 7) {
-                Image(systemName: "location.slash")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Text(loc.t("map.you.outside"))
-                    .typo(.micro)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }
+            NoticeLine(symbol: "location.slash", text: loc.t("map.you.outside"))
         } else if location.isAuthorized {
             HStack(spacing: 7) {
                 ProgressView().controlSize(.mini)
@@ -327,15 +349,9 @@ struct AreaMapView: View {
                              action: loc.t("geo.permission"),
                              symbol: "exclamationmark.triangle") { location.requestAlways() }
             } else {
-                HStack(spacing: Space.hair + 2) {
-                    Image(systemName: "bell.badge.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text(loc.t("geo.monitoring", loc.num(location.monitoredAreaCodes.count)))
-                        .typo(.micro)
-                    Spacer(minLength: 0)
-                }
-                .foregroundStyle(.secondary)
-                .accessibilityElement(children: .combine)
+                NoticeLine(symbol: "bell.badge.fill",
+                           text: loc.t("geo.monitoring",
+                                       loc.num(location.monitoredAreaCodes.count)))
             }
             Divider().overlay(Palette.hairline)
         }
@@ -391,6 +407,11 @@ struct AreaMapView: View {
             youAreHereRow
             geofencePrompt
         }
+        // Tied to the area, not just to the location: without this the row
+        // kept naming the area the reader was in when the map opened. The
+        // position marker moved, the sentence under it did not, and the two
+        // disagreed on screen — which is worse than either alone.
+        .id(currentArea?.code)
     }
 
     // MARK: - List (also the accessible and offline path)
@@ -431,22 +452,64 @@ struct AreaRow: View {
     let area: Area
     let peak: Int
 
+    /// The column the risk badge sits in.
+    ///
+    /// The badge is what positions the season total, not the other way round.
+    /// Left to their intrinsic widths, "Moderate" measures about 90pt against
+    /// "High" at 61pt, and the count ahead of it was pushed by that difference
+    /// — the three totals in Dhaka division ended 31pt apart while the names
+    /// and the badges either side of them sat square. Giving the count its own
+    /// frame does not help: the frame still floats. Fixing the badge's width
+    /// anchors everything to its left.
+    ///
+    /// Sized for the widest band name with a little room, and scaling with
+    /// Dynamic Type the way the age card's columns already do.
+    @ScaledMetric(relativeTo: .caption) private var badgeWidth: CGFloat = 96
+
+    /// The division, unless the area's own name already carries it.
+    ///
+    /// Equality was not enough: "Dhaka (outside city)" is not the string
+    /// "Dhaka", so the chip was printed beside it and took the room that
+    /// forced the name to truncate to "Dhaka (outside…". Every Dhaka row has
+    /// the same shape — the three city-corporation rows all name their
+    /// division — so containment is the rule that was meant.
+    private var divisionLabel: String? {
+        let area = self.area.displayName(loc.language)
+        let division = self.area.division.displayName(loc.language)
+        return area.contains(division) ? nil : division
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 8) {
-                Text(area.displayName(loc.language)).typo(.subheadline)
-                Text(area.division.displayName(loc.language))
-                    .typo(.micro).foregroundStyle(.secondary)
+                Text(area.displayName(loc.language))
+                    .typo(.subheadline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .layoutPriority(1)
+                // Most areas share their division's name — Mymensingh sits in
+                // Mymensingh — so printing both said the same word twice and
+                // used the room that forced it to truncate. Shown only when it
+                // adds something, and then in full.
+                if let division = divisionLabel {
+                    Text(division)
+                        .typo(.micro).foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
                 Spacer(minLength: 6)
                 Text(loc.num(area.seasonCases)).typo(.subheadline).monospacedDigit()
                 RiskBadge(risk: area.risk, compact: true)
+                    .frame(width: badgeWidth, alignment: .trailing)
             }
-            // One measure, one hue: bar length is the season total for every row.
+            // Length is the season total, colour is the area's current risk
+            // band — the same band the badge above shows, so the row can be
+            // read either way round and a list can be scanned by colour.
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Palette.grid).frame(height: 4)
                     Capsule()
-                        .fill(Palette.cases)
+                        .fill(area.risk.tint)
                         .frame(width: max(2, geometry.size.width * CGFloat(area.seasonCases) / CGFloat(max(peak, 1))),
                                height: 4)
                 }
@@ -462,4 +525,47 @@ extension MKCoordinateRegion {
         center: CLLocationCoordinate2D(latitude: 23.68, longitude: 90.35),
         span: MKCoordinateSpan(latitudeDelta: 6.1, longitudeDelta: 5.0)
     )
+}
+
+
+/// Carries the camera's heartbeat without dragging the whole map view into
+/// each frame. Only `YouAreHereOverlay` reads `tick`, so only it redraws.
+@Observable
+final class CameraTicker {
+    var tick: UInt64 = 0
+}
+
+/// The reader's own position, drawn over the map rather than in it.
+///
+/// As map content it sat *under* the case bubbles — MapKit z-orders
+/// annotations north to south, so the Dhaka North bubble covered it exactly
+/// where "am I inside this one?" matters most.
+private struct YouAreHereOverlay: View {
+    let coordinate: CLLocationCoordinate2D
+    let proxy: MapProxy
+    let ticker: CameraTicker
+    let label: String
+
+    var body: some View {
+        // Reading `tick` here, and only here, is what keeps the marker pinned
+        // to the ground as the map moves.
+        let _ = ticker.tick
+        if let point = proxy.convert(coordinate, to: .local) {
+            ZStack {
+                Circle()
+                    .fill(Palette.accent.opacity(0.22))
+                    .frame(width: 34, height: 34)
+                Circle()
+                    .fill(.white)
+                    .frame(width: 20, height: 20)
+                    .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+                Circle()
+                    .fill(Palette.accent)
+                    .frame(width: 13, height: 13)
+            }
+            .position(point)
+            .allowsHitTesting(false)
+            .accessibilityLabel(label)
+        }
+    }
 }

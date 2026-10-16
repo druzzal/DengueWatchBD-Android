@@ -57,6 +57,8 @@ import com.denguewatch.bd.feature.dashboard.LanguageToggle
 import com.denguewatch.bd.feature.map.AreaDetailScreen
 import com.denguewatch.bd.data.CaseLogEntry
 import com.denguewatch.bd.feature.health.LabEntryScreen
+import com.denguewatch.bd.feature.health.FluidEntryScreen
+import com.denguewatch.bd.feature.triage.CheckHistoryScreen
 import com.denguewatch.bd.feature.health.SaveSlot
 import com.denguewatch.bd.feature.health.MyHealthScreen
 import com.denguewatch.bd.feature.health.VitalsEntryScreen
@@ -115,6 +117,8 @@ sealed interface Destination {
     data object SymptomCheck : Destination
     data object RecordVitals : Destination
     data object AddLabReport : Destination
+    data object AddFluid : Destination
+    data object CheckHistory : Destination
     data object CaseLog : Destination
     data class LogDay(val dayMillis: Long) : Destination {
         override val parent: Destination get() = CaseLog
@@ -239,10 +243,12 @@ private fun MainScaffold(
         Destination.SymptomCheck -> loc.t("check.title")
         Destination.RecordVitals -> loc.t("vital.record")
         Destination.AddLabReport -> loc.t("lab.add")
+        Destination.AddFluid -> loc.t("fluid.add.title")
+        Destination.CheckHistory -> loc.t("check.history.title")
         Destination.CaseLog -> loc.t("log.title")
         // The day's own name, so the reader knows which record they opened.
         is Destination.LogDay -> {
-            val days = HealthLog.days(state.vitals.entries, state.labs.reports)
+            val days = state.healthLogDays
             val numbers = HealthLog.numbers(days)
             state.logNames.name(current.dayMillis)
                 ?: numbers[current.dayMillis]?.let { loc.t("log.defaultName", loc.num(it)) }
@@ -313,6 +319,7 @@ private fun MainScaffold(
                     val saveLabel = when (destination) {
                         Destination.RecordVitals -> loc.t("vital.save")
                         Destination.AddLabReport -> loc.t("lab.save")
+                        Destination.AddFluid -> loc.t("common.save")
                         else -> null
                     }
                     if (saveLabel != null) {
@@ -333,7 +340,7 @@ private fun MainScaffold(
                     // day's own screen — in the bar where iOS puts it.
                     when (val current = destination) {
                         Destination.CaseLog -> if (
-                            state.vitals.entries.isNotEmpty() || state.labs.reports.isNotEmpty()
+                            state.healthLogDays.isNotEmpty()
                         ) {
                             ExportLogButton(state, dayMillis = null, modifier = Modifier.padding(end = Space.tight))
                         }
@@ -469,6 +476,8 @@ private fun MainScaffold(
                             modifier = Modifier.readableColumn(),
                             state = state,
                             onOpenCheck = { destination = Destination.SymptomCheck },
+                            onOpenCheckHistory = { destination = Destination.CheckHistory },
+                            onAddDrink = { destination = Destination.AddFluid },
                             onOpenLog = { destination = Destination.CaseLog },
                             onRecordVitals = { destination = Destination.RecordVitals },
                             onAddLabReport = { destination = Destination.AddLabReport },
@@ -580,6 +589,20 @@ Destination.SymptomCheck -> SymptomCheckerScreen(
                 contentPadding = content,
             )
 
+            Destination.AddFluid -> FluidEntryScreen(
+                state = state,
+                saveSlot = saveSlot,
+                modifier = Modifier.readableColumn(),
+                onSaved = { destination = Destination.Tabs },
+                contentPadding = content,
+            )
+
+            Destination.CheckHistory -> CheckHistoryScreen(
+                state = state,
+                modifier = Modifier.readableColumn(),
+                contentPadding = content,
+            )
+
             Destination.CaseLog -> CaseLogScreen(
                 state = state,
                 modifier = Modifier.readableColumn(),
@@ -614,6 +637,7 @@ Destination.SymptomCheck -> SymptomCheckerScreen(
                 outcome = outcome,
                 selected = selectedSymptoms,
                 feverDaysAgo = feverDaysAgo,
+                raisedByRiskGroup = TriageEngine.isRaisedByRiskGroup(selectedSymptoms, triageContext),
                 onFindCare = {
                     destination = Destination.Tabs
                     state.show(Tab.CARE)

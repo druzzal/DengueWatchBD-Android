@@ -2,12 +2,45 @@ import Foundation
 
 extension Strings {
     static let enDashboard: [String: String] = [
+        // My health
+        "health.empty": "Track your symptoms and understand when to seek care.",
+        "health.check": "Check symptoms",
+        "health.checkAgain": "Check again",
+        "health.checkedAt": "Checked %@",
+
+        // Top areas
+        "top.title": "Top areas",
+        "top.subtitle": "Highest 14-day rate per 100,000 people",
+        "top.rate": "%@ per 100,000",
+        "top.viewMap": "View map",
+
+        // What changed — deterministic surveillance statements
+        "digest.title": "What changed",
+        "digest.subtitle": "Since the last DGHS report",
+        "digest.national.rise": "Reported cases rose %@%% nationwide this week.",
+        "digest.national.fall": "Reported cases fell %@%% nationwide this week.",
+        "digest.national.steady": "Reported cases held roughly steady nationwide this week.",
+        "digest.hotspots.one": "One area is at high risk or above.",
+        "digest.hotspots.many": "%@ areas are at high risk or above.",
+        "digest.rises.one": "The steepest rise was in %@.",
+        "digest.rises.two": "The steepest rises were in %@ and %@.",
+        "digest.noBreakdown": "Area-level figures were not in this report.",
+        "digest.action": "See surveillance",
+
         "who.title": "Who is affected",
         "who.subtitle": "Reported cases this season, by age and sex",
+        // Cases DGHS counted but recorded no sex for — 244 of them this
+        // season. Named rather than hidden, since the bar draws them.
+        "who.unrecorded": "Not recorded",
+        "who.a11y.unrecorded": "%@ with no sex recorded.",
         "who.male": "Male",
         "who.female": "Female",
         "who.share": "%@%%",
         "who.a11y": "Ages %@: %@ male, %@ female",
+        "risk.card.hereNow": "%@, where you are now",
+        // DGHS reports ten areas for the whole country, so a located reading is
+        // an average over a division, not a neighbourhood.
+        "risk.card.covers": "A single figure for this whole area — about %@ people",
         "dash.stat.last24": "Last 24 hours",
         "dash.stat.last24Deaths": "%@ deaths",
         "dash.title": "DengueWatch",
@@ -15,7 +48,8 @@ extension Strings {
         "dash.about.a11y": "About this data",
 
         "dash.stat.cases": "Cases this season",
-        "dash.stat.vsLastWeek": "vs last week",
+        "dash.stat.seasonDeaths": "Deaths this season",
+        "dash.stat.vsLastWeek": "vs previous 7 days",
         "dash.delta.a11y": "%@ versus the previous week",
 
         "dash.legend.daily": "Daily reported",
@@ -31,7 +65,7 @@ extension Strings {
         "dash.history.a11y": "%@: %@ cases, %@ deaths",
 
 
-        "dash.home.detail": "%@ cases in the last 7 days · %@ per 100k over 14 days",
+        "dash.home.detail": "%@ cases in the latest full week · %@ per 100k over 14 days",
 
         "sync.updating": "Updating…",
         "sync.justUpdated": "Data updated",
@@ -43,12 +77,41 @@ extension Strings {
     ]
 
     static let bnDashboard: [String: String] = [
+        // আমার স্বাস্থ্য
+        "health.empty": "উপসর্গ লিখে রাখুন, কখন চিকিৎসা নিতে হবে বুঝে নিন।",
+        "health.check": "উপসর্গ পরীক্ষা করুন",
+        "health.checkAgain": "আবার পরীক্ষা করুন",
+        "health.checkedAt": "%@ পরীক্ষা করা হয়েছে",
+
+        // শীর্ষ এলাকা
+        "top.title": "শীর্ষ এলাকা",
+        "top.subtitle": "প্রতি লাখে ১৪ দিনের সর্বোচ্চ হার",
+        "top.rate": "প্রতি লাখে %@",
+        "top.viewMap": "মানচিত্র দেখুন",
+
+        // What changed
+        "digest.title": "কী বদলাল",
+        "digest.subtitle": "স্বাস্থ্য অধিদপ্তরের গত প্রতিবেদনের পর",
+        "digest.national.rise": "এ সপ্তাহে সারা দেশে শনাক্ত রোগী %@%% বেড়েছে।",
+        "digest.national.fall": "এ সপ্তাহে সারা দেশে শনাক্ত রোগী %@%% কমেছে।",
+        "digest.national.steady": "এ সপ্তাহে সারা দেশে শনাক্ত রোগীর সংখ্যা প্রায় অপরিবর্তিত।",
+        "digest.hotspots.one": "একটি এলাকা উচ্চ বা তার বেশি ঝুঁকিতে আছে।",
+        "digest.hotspots.many": "%@টি এলাকা উচ্চ বা তার বেশি ঝুঁকিতে আছে।",
+        "digest.rises.one": "সবচেয়ে বেশি বেড়েছে %@-এ।",
+        "digest.rises.two": "সবচেয়ে বেশি বেড়েছে %@ ও %@-এ।",
+        "digest.noBreakdown": "এই প্রতিবেদনে এলাকাভিত্তিক তথ্য ছিল না।",
+        "digest.action": "নজরদারি দেখুন",
+
         "who.title": "কারা আক্রান্ত হচ্ছেন",
         "who.subtitle": "এ মৌসুমে বয়স ও লিঙ্গ অনুযায়ী শনাক্ত রোগী",
+        "who.unrecorded": "লেখা নেই",
+        "who.a11y.unrecorded": "%@ জনের লিঙ্গ লেখা নেই।",
         "who.male": "পুরুষ",
         "who.female": "নারী",
         "who.share": "%@%%",
         "who.a11y": "%@ বছর: %@ জন পুরুষ, %@ জন নারী",
+        "risk.card.hereNow": "%@, আপনি এখন যেখানে আছেন",
+        "risk.card.covers": "পুরো এলাকার জন্য একটিই হিসাব — প্রায় %@ মানুষ",
         "dash.stat.last24": "গত ২৪ ঘণ্টা",
         "dash.stat.last24Deaths": "%@ জন মৃত্যু",
         "dash.title": "ডেঙ্গুওয়াচ",
@@ -56,7 +119,8 @@ extension Strings {
         "dash.about.a11y": "এই তথ্য সম্পর্কে",
 
         "dash.stat.cases": "এ মৌসুমে আক্রান্ত",
-        "dash.stat.vsLastWeek": "গত সপ্তাহের তুলনায়",
+        "dash.stat.seasonDeaths": "এ মৌসুমে মৃত্যু",
+        "dash.stat.vsLastWeek": "আগের ৭ দিনের তুলনায়",
         "dash.delta.a11y": "গত সপ্তাহের তুলনায় %@",
 
         "dash.legend.daily": "দৈনিক শনাক্ত",
@@ -72,7 +136,7 @@ extension Strings {
         "dash.history.a11y": "%@: %@ জন আক্রান্ত, %@ জনের মৃত্যু",
 
 
-        "dash.home.detail": "গত ৭ দিনে %@ জন · ১৪ দিনে প্রতি লাখে %@",
+        "dash.home.detail": "সর্বশেষ পূর্ণ সপ্তাহে %@ জন · ১৪ দিনে প্রতি লাখে %@",
 
         "sync.updating": "হালনাগাদ হচ্ছে…",
         "sync.justUpdated": "তথ্য হালনাগাদ হয়েছে",

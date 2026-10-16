@@ -30,11 +30,28 @@ final class LocationManager: NSObject {
 
     private let manager = CLLocationManager()
 
+    /// Set when a fix was asked for before there was permission to take one.
+    ///
+    /// The permission card asks in the same breath as it requests access, and
+    /// at that instant authorisation is still undetermined — so the request
+    /// was dropped and the reader sat looking at the national reading until
+    /// they left the tab and came back. Remembering the intent is what makes
+    /// "Allow location" do something immediately.
+    private var fixWanted = false
+
     override init() {
         authorization = manager.authorizationStatus
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        // The smallest thing this app resolves is a city corporation, about
+        // twelve kilometres across. Ten-metre accuracy was asking the GPS
+        // chip for a precision no screen here uses, and paying for it in
+        // battery on a phone people keep open while they are unwell.
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        // Nor does a few metres of drift change any answer. Without a filter
+        // every jitter delivered an update, and each one redrew the hero, the
+        // map marker and the legend.
+        manager.distanceFilter = 250
         // iOS keeps monitored regions across launches, so what is already being
         // watched is authoritative — not whatever the UI last happened to arm.
         monitoredAreaCodes = Set(manager.monitoredRegions.map(\.identifier))
@@ -57,10 +74,27 @@ final class LocationManager: NSObject {
 
     // MARK: - Coarse location for nearby search
 
+    /// A stream of positions, for the map, where the marker has to keep up
+    /// with the reader as they move.
     func startUpdatingCoarse() {
         guard isAuthorized else { return }
-        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         manager.startUpdatingLocation()
+    }
+
+    /// A single fix, for screens that only need to know which area the reader
+    /// is in right now.
+    ///
+    /// Home wants one answer, not a subscription. It had no matching stop, so
+    /// opening the app once left the GPS running for as long as it stayed
+    /// open — the most expensive way to learn something that changes when you
+    /// travel between districts.
+    func requestOneFix() {
+        guard isAuthorized else {
+            fixWanted = true
+            return
+        }
+        fixWanted = false
+        manager.requestLocation()
     }
 
     func stopUpdatingCoarse() {
@@ -159,6 +193,11 @@ extension LocationManager: CLLocationManagerDelegate {
             if !wasBackground, self.hasBackgroundAuthorization {
                 self.rearmFromSnapshot()
             }
+            // And deliver the fix somebody asked for before they had the right
+            // to one — the usual path through the permission card.
+            if self.fixWanted, self.isAuthorized {
+                self.requestOneFix()
+            }
         }
     }
 
@@ -170,15 +209,31 @@ extension LocationManager: CLLocationManagerDelegate {
         }
     }
 
+    /// Required, not optional: `requestLocation()` asserts at runtime if the
+    /// delegate does not implement this, and takes the app down with it. The
+    /// one-shot fix on Home and Care depends on it existing.
+    ///
+    /// A failure is not worth surfacing. The last known position, if there is
+    /// one, still answers "which area am I in" perfectly well, and if there is
+    /// none the screens already have their national fallback.
+    nonisolated func locationManager(_ manager: CLLocationManager,
+                                     didFailWithError error: Error) {
+        // Deliberately silent. A denied or momentarily unavailable fix is an
+        // expected state here, not an error the reader can act on.
+    }
+
     nonisolated func locationManager(_ manager: CLLocationManager,
                                      didEnterRegion region: CLRegion) {
+        // Read the identifier here: a String crosses to the main actor safely,
+        // where the CLRegion itself does not.
+        let code = region.identifier
         Task { @MainActor in
             // Raised from the persisted snapshot rather than from the store, so
             // this works on a cold background launch where nothing else is up.
-            if let watched = WatchedAreaStore.area(code: region.identifier) {
+            if let watched = WatchedAreaStore.area(code: code) {
                 await NotificationManager.shared.raiseGeofenceAlert(area: watched)
             }
-            self.onRegionEntry?(region.identifier)
+            self.onRegionEntry?(code)
         }
     }
 }

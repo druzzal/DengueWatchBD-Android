@@ -19,20 +19,47 @@ struct SectionHeader<Trailing: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Space.tight) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).typo(.sectionTitle)
-                if let subtitle {
-                    Text(subtitle)
-                        .typo(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer(minLength: Space.tight)
-            trailing
+        // Side by side while both fit; otherwise the badge drops below rather
+        // than squeezing the title into two lines. "Today in Bangladesh" beside
+        // a source badge is exactly wide enough to need this.
+        ViewThatFits(in: .horizontal) {
+            sideBySide
+            stacked
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
+    }
+
+    private var sideBySide: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.tight) {
+            titleBlock
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            Spacer(minLength: Space.tight)
+            trailing
+        }
+    }
+
+    private var stacked: some View {
+        VStack(alignment: .leading, spacing: Space.tight) {
+            HStack { titleBlock; Spacer(minLength: 0) }
+            // A header with no accessory must not gain a gap where one would
+            // have gone; most headers in the app are title-only.
+            if !(Trailing.self is EmptyView.Type) {
+                HStack { trailing; Spacer(minLength: 0) }
+            }
+        }
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).typo(.sectionTitle)
+            if let subtitle {
+                Text(subtitle)
+                    .typo(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 
@@ -50,36 +77,72 @@ struct Card<Content: View>: View {
 }
 
 struct CardSection<Content: View>: View {
+    @Environment(LocalizationManager.self) private var loc
+
     var title: String
     var subtitle: String?
     var accessory: AnyView?
+    /// When bound, the header becomes a control that shows and hides the body.
+    /// Cards that are always open pass nothing and behave as before.
+    var isExpanded: Binding<Bool>?
     @ViewBuilder var content: Content
 
     init(_ title: String, subtitle: String? = nil, accessory: AnyView? = nil,
+         isExpanded: Binding<Bool>? = nil,
          @ViewBuilder content: () -> Content) {
         self.title = title
         self.subtitle = subtitle
         self.accessory = accessory
+        self.isExpanded = isExpanded
         self.content = content()
     }
+
+    private var isOpen: Bool { isExpanded?.wrappedValue ?? true }
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: Space.row) {
-                HStack(alignment: .firstTextBaseline, spacing: Space.tight) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title).typo(.headline)
-                        if let subtitle {
-                            Text(subtitle)
-                                .typo(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                if let isExpanded {
+                    Button {
+                        withAnimation(.snappy(duration: 0.22)) {
+                            isExpanded.wrappedValue.toggle()
                         }
+                    } label: {
+                        header.contentShape(Rectangle())
                     }
-                    Spacer(minLength: Space.hair)
-                    accessory
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(title)
+                    .accessibilityValue(loc.t(isOpen ? "common.expanded" : "common.collapsed"))
+                } else {
+                    header
                 }
-                content
+                if isOpen { content }
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.tight) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .typo(.headline)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                if let subtitle {
+                    Text(subtitle)
+                        .typo(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: Space.hair)
+            accessory
+            if isExpanded != nil {
+                Image(systemName: "chevron.down")
+                    .typo(.caption)
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isOpen ? 0 : -90))
             }
         }
     }
@@ -100,7 +163,18 @@ struct RiskBadge: View {
             Text(loc.t(risk.labelKey))
                 .typo(compact ? .micro : .caption)
                 .fontWeight(.semibold)
+                .lineLimit(1)
+                // A band name shrinks rather than losing a character, now that
+                // the ranked row gives the badge a fixed column to sit in.
+                .minimumScaleFactor(0.8)
         }
+        // The badge keeps its intrinsic width instead of being squeezed.
+        // Without this, a row with a long area name — Mymensingh was the one
+        // that showed it — compressed the badge until "Moderate" wrapped onto
+        // two lines. A risk label broken across lines is harder to read than a
+        // truncated place name, and the place name is the part the reader
+        // already knows, so the name yields and this does not.
+        .fixedSize(horizontal: true, vertical: false)
         .foregroundStyle(risk.ink)
         .padding(.horizontal, compact ? 8 : 10)
         .padding(.vertical, compact ? 4 : 6)
@@ -309,19 +383,47 @@ struct ChartLegend: View {
 
     let items: [Item]
 
+    /// One row where the keys fit, two where they do not.
+    ///
+    /// The weekly area chart needs five keys — four bands and the average — and
+    /// on a phone the last of them was given so little room that "3-week
+    /// average" wrapped to "3-week / average". A key is a label, not a
+    /// paragraph: `fixedSize` keeps each on one line, and the fallback gives the
+    /// trailing key a row of its own rather than squeezing it. The same shape as
+    /// `RiskScaleLegend` below, for the same reason.
     var body: some View {
-        HStack(spacing: Space.row) {
-            ForEach(items) { item in
-                HStack(spacing: 5) {
-                    if item.isLine {
-                        Capsule().fill(item.color).frame(width: 14, height: 2.5)
-                    } else {
-                        RoundedRectangle(cornerRadius: 2).fill(item.color).frame(width: 9, height: 9)
-                    }
-                    Text(item.label).typo(.micro).foregroundStyle(.secondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Space.row) {
+                entries(items)
+                Spacer(minLength: 0)
+            }
+            VStack(alignment: .leading, spacing: Space.hair + 2) {
+                HStack(spacing: Space.row) {
+                    entries(Array(items.dropLast()))
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: Space.row) {
+                    entries(Array(items.suffix(1)))
+                    Spacer(minLength: 0)
                 }
             }
-            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func entries(_ items: [Item]) -> some View {
+        ForEach(items) { item in
+            HStack(spacing: 5) {
+                if item.isLine {
+                    Capsule().fill(item.color).frame(width: 14, height: 2.5)
+                } else {
+                    RoundedRectangle(cornerRadius: 2).fill(item.color).frame(width: 9, height: 9)
+                }
+                Text(item.label)
+                    .typo(.micro)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
         }
     }
 }

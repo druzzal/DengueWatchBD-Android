@@ -48,6 +48,7 @@ import com.denguewatch.bd.feature.shared.InlineNote
 import com.denguewatch.bd.feature.shared.SecondaryActionButton
 import com.denguewatch.bd.feature.shared.Sparkline
 import com.denguewatch.bd.i18n.LocalLocalization
+import com.denguewatch.bd.model.FluidLog
 import com.denguewatch.bd.model.HealthLog
 import com.denguewatch.bd.model.HealthLogDay
 import com.denguewatch.bd.model.MeasureStatus
@@ -98,7 +99,7 @@ fun CaseLogScreen(
     var renaming by remember { mutableStateOf<Long?>(null) }
     var confirmingDay by remember { mutableStateOf<Long?>(null) }
 
-    val ordered = HealthLog.days(state.vitals.entries, state.labs.reports)
+    val ordered = state.healthLogDays
     val days = if (oldestFirst) ordered.reversed() else ordered
     val numbers = HealthLog.numbers(ordered)
     val temperatures = state.vitals.series(VitalKind.TEMPERATURE)
@@ -112,12 +113,16 @@ fun CaseLogScreen(
     fun deleteDay(day: HealthLogDay) {
         day.vitals.forEach { state.vitals.delete(it.id) }
         day.labs.forEach { state.labs.delete(it.id) }
+        day.fluids.forEach { state.fluids.delete(it.id) }
         // A name must not outlive the day it belonged to, or tomorrow's records
         // would inherit it.
         state.logNames.forget(day.dateMillis)
     }
 
-    if (days.isEmpty()) {
+    // Symptom checks are not listed here, but Delete all removes them, so the
+    // list stays reachable while any check exists. Showing the empty state for
+    // a reader with only checks left them no way at all to delete them.
+    if (days.isEmpty() && state.caseLog.entries.isEmpty()) {
         Box(modifier.fillMaxSize().background(colors.plane).padding(contentPadding)) {
             EmptyStateView(
                 icon = DwIcons.log,
@@ -172,7 +177,12 @@ fun CaseLogScreen(
             }
         }
 
-        item {
+        if (days.isEmpty()) item {
+            InlineNote(
+                detail = loc.t("log.checksOnly"),
+                modifier = Modifier.padding(horizontal = Space.screen),
+            )
+        } else item {
             GroupedSection(
                 title = loc.t("log.entries"),
                 modifier = Modifier.padding(horizontal = Space.screen),
@@ -228,6 +238,7 @@ fun CaseLogScreen(
                     state.caseLog.clear()
                     state.vitals.clear()
                     state.labs.clear()
+                    state.fluids.clear()
                     state.logNames.clear()
                     confirmingDelete = false
                 }) { Text(loc.t("common.deleteAll")) }
@@ -350,8 +361,10 @@ private fun LogDayRow(
     val colors = Dw.colors
     val status = day.worstStatus
     // Coloured by the furthest a reading strayed that day, so a bad day is
-    // visible without opening it.
-    val accent = if (status == MeasureStatus.NORMAL) colors.accent else colors.riskInk(status.risk)
+    // visible without opening it: green when every reading was in its usual
+    // range. A day with only fluids keeps the accent — it has no reading to be
+    // normal about.
+    val accent = if (day.hasReadings) colors.riskInk(status.risk) else colors.accent
     var menu by remember { mutableStateOf(false) }
 
     val figures = buildList {
@@ -359,6 +372,8 @@ private fun LogDayRow(
         day.peakTemperature?.let { add(loc.decimal(unit.fromCelsius(it), 1) + unit.symbol) }
         day.latestBloodPressure?.let { (s, d) -> add("${loc.num(s)}/${loc.num(d)}") }
         day.lowestPlatelets?.let { add("${loc.t("lab.platelets")} ${loc.num(it.toInt())}") }
+        FluidLog.day(day.dateMillis, day.fluids).drunkMillilitres.takeIf { it > 0 }
+            ?.let { add("${loc.num(it)} ${loc.t("fluid.unit.ml")}") }
     }.joinToString(" · ")
 
     Box {
@@ -372,7 +387,7 @@ private fun LogDayRow(
                         title,
                         loc.fullDate(day.dateMillis),
                         figures,
-                        loc.t(status.labelKey),
+                        if (day.hasReadings) loc.t(status.labelKey) else "",
                     ).filter { it.isNotEmpty() }.joinToString(", ")
                 },
             verticalAlignment = Alignment.CenterVertically,
@@ -403,7 +418,7 @@ private fun LogDayRow(
             }
 
             Text(
-                loc.num(day.itemsNewestFirst.size),
+                loc.num(day.itemsNewestFirst.size + day.fluids.size),
                 style = typo(Typo.MICRO).tabularFigures(),
                 color = colors.secondaryText,
             )

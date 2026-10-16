@@ -54,7 +54,7 @@ object HealthLogExport {
      * its own page as well.
      */
     fun request(state: AppState, dayMillis: Long? = null): Request? {
-        val all = HealthLog.days(state.vitals.entries, state.labs.reports)
+        val all = state.healthLogDays
         val ordered = if (state.preferences.logOldestFirst) all.reversed() else all
         val chosen = if (dayMillis == null) ordered else ordered.filter { it.dateMillis == dayMillis }
         if (chosen.isEmpty()) return null

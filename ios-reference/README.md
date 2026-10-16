@@ -1,12 +1,14 @@
 # DengueWatch Bangladesh
 
-An iOS dengue surveillance app for Bangladesh: national and area-level case
-tracking, a WHO-criteria symptom check, a personal case log, prevention
-guidance, and local alerts when your own area gets worse.
+An iOS dengue app for Bangladesh: national and area-level case tracking, a
+symptom check and care plan built on WHO's 2025 guideline, a personal health
+record to hand to a doctor, prevention guidance, and local alerts when your own
+area gets worse.
 
-- **SwiftUI + Swift Charts + MapKit**, iOS 17.0 and up, iPhone and iPad.
-- **No backend, no account, no analytics, no location permission.** Everything
-  the user enters stays in the app container.
+- **SwiftUI + Swift Charts + MapKit + VisionKit**, iOS 17.0 and up, iPhone and
+  iPad.
+- **No backend, no account, no analytics.** Location is optional and is only
+  used on the device. Everything the user enters stays in the app container.
 
 ## Building
 
@@ -27,26 +29,89 @@ In DEBUG builds the app can open straight onto a given tab, which is what the
 screenshot and UI-test runs use:
 
 ```sh
-SIMCTL_CHILD_DW_START_TAB=map xcrun simctl launch booted bd.denguewatch.app
+SIMCTL_CHILD_DW_START_TAB=map xcrun simctl launch booted bd.uzzal.denguewatch
 ```
 
-`DW_START_TAB` is one of overview/map/check/care/prevent, and is compiled out of
+`DW_START_TAB` is one of home/map/health/care/prevent, and is compiled out of
 release builds.
+
+### Tests
+
+```sh
+# Unit tests: rules, stores, localisation, PDF
+xcodebuild test -project DengueWatchBD.xcodeproj -scheme DengueWatchBD \
+  -destination "platform=iOS Simulator,name=iPhone 18 Pro" -only-testing:DengueWatchBDTests
+
+# UI tests: the My health flows, tapped on the real app
+xcodebuild test -project DengueWatchBD.xcodeproj -scheme DengueWatchBD \
+  -destination "platform=iOS Simulator,name=iPhone 18 Pro" -only-testing:DengueWatchBDUITests
+```
+
+The UI tests add a drink, log and undo a urination, complete a symptom check,
+delete the latest check and a past one, and export the log to the share sheet.
+They launch the app with `DW_UITEST=1`, which (in DEBUG builds only, see
+`App/UITestSupport.swift`) starts it empty, in English, past the first-run
+disclaimer and without animations; `DW_UITEST_SEED=checks,vitals` adds sample
+records. They match English labels, so a reworded button means updating the
+test that taps it.
+
+### Installing on an iPhone
+
+Build the Release configuration for a connected, paired phone, then install and
+launch it with `devicectl`:
+
+```sh
+xcodebuild -project DengueWatchBD.xcodeproj -scheme DengueWatchBD \
+  -configuration Release -destination "id=<device UDID>" \
+  -derivedDataPath build -allowProvisioningUpdates build
+xcrun devicectl device install app --device <device UDID> \
+  build/Build/Products/Release-iphoneos/DengueWatchBD.app
+xcrun devicectl device process launch --device <device UDID> bd.uzzal.denguewatch
+```
+
+`xcrun devicectl list devices` gives the UDID. Installing over an existing copy
+keeps the reader's data.
+
+Signing is automatic, with team `KC45FLCGH2`. A build signed with a free Apple ID
+team carries a provisioning profile that expires after seven days, after which
+the app will not open until it is rebuilt and reinstalled; a paid Apple
+Developer Program membership gives profiles that last a year. Check a build's
+expiry with:
+
+```sh
+security cms -D -i DengueWatchBD.app/embedded.mobileprovision | plutil -extract ExpirationDate raw -
+```
+
+A direct build like this keeps its debug symbols (the binary is about 13 MB);
+an App Store archive strips them.
+
+### Privacy manifest
+
+`DengueWatchBD/PrivacyInfo.xcprivacy` declares no tracking and no collected
+data, and one required-reason API: UserDefaults (`CA92.1`), for the app's own
+settings. Feed refreshes are decided by the server's ETag and Last-Modified
+headers and a sync date in UserDefaults, not by file timestamps, so the file
+timestamp category is not declared. Any new required-reason API — file
+timestamps, system boot time, disk space — needs adding here before
+submission.
 
 ## Features
 
-| Screen | What it does |
+| Tab | What it does |
 |---|---|
-| **Overview** | National totals, epidemic curve with a scrubable 7-day average, who is affected by age and sex, deaths, areas to watch, season history back to 2018. Language toggle lives here. |
-| **Map** | Ten reporting areas as proportional symbols, by total cases or two-week rate per 100k. Shows your live location and which area you are in, with that area's risk band. A searchable list view doubles as the offline and screen-reader path. |
-| **Check** | WHO warning-sign triage with an original illustration per symptom, fever-phase awareness, higher-risk-group handling, and a personal log. |
+| **Home** | The national risk level and its trend, today's DGHS figures, what changed since the last report, the areas to watch, the epidemic curve with a scrubbable 7-day average, deaths, who is affected by age and sex, and season history back to 2018. |
+| **Map** | Ten reporting areas as proportional symbols, by total cases or two-week rate per 100k, each with its 14-day risk band. Shows your live location and which area you are in. A searchable list view doubles as the offline and screen-reader path. An area can be shared as an image card. |
+| **My health** | The symptom check, the fever timeline, the WHO care plan, the fluid log, vital signs and lab reports (typed in, photographed or uploaded, and read on the device), with trend charts and an A4 PDF of the whole log or a single day. |
 | **Care** | Emergency numbers, live nearby-hospital search through Maps, and a directory of major government dengue hospitals with directions. |
-| **Prevent** | Five prevention topics, the seasonal calendar, area risk alerts and the enter-a-high-risk-area warning. |
+| **Prevent** | A daily prevention checklist, five prevention topics, the dengue year, myths and facts, area risk alerts and the enter-a-high-risk-area warning. |
+
+Every tab carries the language toggle.
 
 ## Bilingual
 
-Full Bengali and English, switched in-app (not by device language) from the home
-screen. 352 string keys per language, checked for parity. Bengali also gets:
+Full Bengali and English, switched in-app (not by device language) from the
+button at the top of every tab. 652 string keys per language, checked for parity
+by the tests. Bengali also gets:
 
 - **Bengali numerals** everywhere — `১.৮ লাখ`, not `178k`.
 - **Bengali magnitude words** — হাজার / লাখ / কোটি rather than k / M, because
@@ -86,6 +151,23 @@ by hand, and the same URLs the app reads can be opened in a browser.
 There is no API key, no account and no server of our own. The feed is a static
 file on GitHub Pages, which is also why it needs no credential shipped inside
 the app.
+
+### When the feed stops updating
+
+If the DGHS dashboard changes shape, the scraper can stop producing new reports
+without anything visibly failing. Two things catch that:
+
+- **Readers** see a warning in the app once its figures are three days old, and
+  a stronger one at seven.
+- **The maintainer** hears a day earlier. `.github/workflows/feed-freshness.yml`
+  runs daily at noon Dhaka time, reads `summary.json`, and fails when the latest
+  report is two days or more behind today's Dhaka date, or the feed cannot be
+  read. A failure opens one GitHub issue, "Dengue feed has stopped updating",
+  comments on it each further day, and the first fresh run closes it. GitHub
+  also emails the failure. It can be run by hand from the Actions tab.
+
+A day missed for a public holiday will raise the issue too; it closes itself
+when DGHS resumes.
 
 ## Location
 
@@ -145,7 +227,11 @@ raise no licensing questions. Severity is carried by shape as well as tint.
 
 `DengueWatchBD/Resources/dengue-feed.json` is the offline seed: a copy of the
 published feed, so the app shows real figures on first launch with no network at
-all. `FeedSync` replaces it with a download as soon as one succeeds.
+all. `FeedSync` replaces it with a download as soon as one succeeds. The seed is
+currently the DGHS report of 15 October 2026. Refresh it before a release by
+copying the published
+[`latest.json`](https://druzzal.github.io/dengue-bd-dashboard/data/latest.json)
+over it, as long as its `schema_version` still matches.
 
 The feed carries, for the current season:
 
@@ -185,28 +271,37 @@ ingestion pipeline lives in
 ```
 DengueWatchBD.xcodeproj
 DengueWatchBD/          the app (below)
-DengueWatchBDTests/     decoding, mapping, geography and localisation tests
+DengueWatchBDTests/     decoding, mapping, geography, triage, care plan, health
+                        log, PDF and localisation tests
+DengueWatchBDUITests/   the My health flows, driven on the real app
+.github/workflows/      the daily feed-freshness check
 Tools/                  helper scripts
 ```
 
 Inside `DengueWatchBD/`:
 
 ```
-App/            entry point, tab shell, about + first-run disclaimer
-Models/         FeedPayload (wire format), Domain (Area, Geography, RiskLevel)
+App/            entry point, tab shell, about + first-run disclaimer, UI-test
+                launch state (DEBUG only)
+Models/         FeedPayload (wire format), Domain (Area, Geography, RiskLevel),
+                WHOCarePlan, vital signs, lab reports, fluid log
 Localization/   AppLanguage, NumberStyle, the two string tables, place names
 Data/           DengueStore, DengueFeedService, FeedSync, FeedConfig,
-                case log, preferences
+                background refresh, preferences, and the case log, vitals,
+                lab and fluid stores
 Design/         Theme.swift (validated palette), Typography.swift (type scale)
 Features/
   Dashboard/    stat tiles, case trend, deaths, age/sex breakdown, history,
                 shared chart axes
   Map/          proportional-symbol map, area list, area detail
-  Triage/       symptom check, triage engine, personal log
+  Triage/       symptom check, triage engine, health log
+  Health/       My health, care plan card, fluid log, vitals and lab entry,
+                lab scanner, PDF export
   Care/         emergency numbers, hospital directory, nearby search
   Prevention/   prevention topics, seasonal calendar
   Alerts/       notification scheduling, alert + geofence settings
   Location/     the single CoreLocation owner
+  Share/        shareable area cards
   Illustrations/ symptom motifs drawn as paths
   Shared/       cards, chips, sparkline, legends, language toggle
 ```
@@ -228,9 +323,48 @@ than chosen by eye:
 Cases, deaths and hospital census each get their own card and their own y-axis.
 There is no dual-axis chart anywhere in the app.
 
+## Your health record
+
+My health keeps four on-device stores: symptom checks, vital-sign readings, lab
+reports and the fluid log. Nothing in them leaves the phone unless the reader
+exports a PDF and chooses where to send it. Lab reports that are photographed or
+uploaded are read with Apple's Vision framework on the device, and the values
+are shown as a draft for the reader to check before anything is saved.
+
+The record shows and flags; it does not interpret. A reading outside the usual
+range is marked as worth showing to a clinician, never explained, and no
+combination of readings produces a diagnosis. The log groups everything by day,
+and one day can be renamed, deleted or exported on its own. "Delete all" clears
+all four stores.
+
+A single symptom check can be deleted from the symptom check card in My health,
+and any earlier one from its list of past checks. The care plan and fever
+timeline then follow the check before it.
+
+A check's advice is worked out from its saved answers each time it is shown,
+by the current rules, so a check made before a rule changed says what the care
+plan beside it says. The outcome shown at the time is still stored with it.
+
+The PDF opens with an at-a-glance summary and trend charts, then the record day
+by day. When fluids were logged it adds a fluid summary — days logged, average
+drunk on a whole day, and the days urine reached WHO's aim — and two daily bar
+charts, intake and urine. Today is left out of the averages and drawn paler,
+because it is not over yet.
+
 ## Medical scope
 
-The symptom check implements WHO dengue warning-sign criteria to help someone
-decide *when to seek care*. It does not diagnose. Severe signs route straight to
-"go to hospital now" with a 999 call button, warning signs route to "see a doctor
-today", and the NSAID warning appears in every advice path that involves fever.
+The symptom check and care plan follow WHO's *Guidelines for clinical
+management of arboviral diseases* (2025), which supersede the 2009 dengue
+guidelines and their A / B / C groups. They help someone decide *when to seek
+care*. They do not diagnose. Severe signs route straight to "go to hospital now"
+with a 999 call button. Warning signs, being unable to drink, pregnancy, and
+age or a long-term condition route to "see a doctor today". The NSAID warning
+appears in every advice path that involves fever.
+
+WHO's outpatient recommendation of measured oral fluids is the fluid log in My
+health: drinks in millilitres and the number of times urine was passed, against
+WHO's aim of four to six times a day. It sets no volume target, because WHO sets
+that by age and condition. If no urine has been logged for six waking hours —
+the symptom check's own warning sign — it says so; the night, 11 pm to 7 am,
+does not count, so a night's sleep does not raise it every morning. A haematocrit that rises on two reports in a row is
+pointed out for the doctor, but like every lab value it never changes the advice.

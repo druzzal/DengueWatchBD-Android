@@ -105,12 +105,24 @@ struct InlineNote: View {
     var symbol: String = "info.circle"
     var title: String?
     var detail: String
+    /// Nil keeps the quiet grey of a footnote. A tint marks the note as
+    /// something to act on — never louder than the thing it refers to.
+    var tint: Color?
+
+    /// The symbol sits in a column of its own width rather than its glyph's.
+    ///
+    /// SF Symbols are not one width: a triangle, a droplet and an info circle
+    /// each start the text in a different place, and the care plan stacks four
+    /// of these notes with four different symbols. Scaled, so the column still
+    /// holds at the largest type sizes.
+    @ScaledMetric(relativeTo: .caption) private var symbolWidth: CGFloat = 17
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.tight + 2) {
             Image(systemName: symbol)
                 .typo(.caption)
-                .foregroundStyle(Palette.mutedInk)
+                .foregroundStyle(tint ?? Palette.mutedInk)
+                .frame(width: symbolWidth)
                 .padding(.top, 1)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
@@ -125,7 +137,7 @@ struct InlineNote: View {
         }
         .padding(Space.row)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.mutedInk.opacity(0.07),
+        .background((tint ?? Palette.mutedInk).opacity(tint == nil ? 0.07 : 0.12),
                     in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .accessibilityElement(children: .combine)
     }
@@ -198,3 +210,71 @@ struct FacilityRow: View {
         .padding(.vertical, Space.row)
     }
 }
+
+/// A line of small print with a symbol in front of it.
+///
+/// Shared so that a stack of them lines up. Written out by hand, each line
+/// chose its own spacing and let the glyph set the text's left edge, so a bell
+/// and a crossed-out location arrow began their sentences in two different
+/// places.
+struct NoticeLine: View {
+    @ScaledMetric(relativeTo: .caption) private var symbolWidth: CGFloat = 14
+
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.hair + 2) {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .semibold))
+                .frame(width: symbolWidth)
+                .accessibilityHidden(true)
+            Text(text)
+                .typo(.micro)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The line under a reading field that will not save as typed.
+///
+/// Shared by the vital-sign and blood-count forms so the two refuse in the
+/// same words. Renders nothing at all when the field is empty or good, so it
+/// can sit in either form unconditionally.
+struct InvalidReadingNote: View {
+    @Environment(LocalizationManager.self) private var loc
+
+    let reading: MeasureInput.Reading
+
+    var body: some View {
+        if let message {
+            Text(message)
+                .typo(.micro)
+                .foregroundStyle(Palette.riskInk(.severe))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var message: String? {
+        switch reading {
+        case .empty, .value:
+            return nil
+        case .notANumber:
+            return loc.t("measure.invalid.number")
+        case .outOfRange(let range):
+            return loc.t("measure.invalid.range",
+                         bound(range.lowerBound), bound(range.upperBound))
+        }
+    }
+
+    /// A decimal place only where the bound has one. White cells start at 0.1,
+    /// and rounding that to "0" would quote back a range that includes a value
+    /// the field refuses.
+    private func bound(_ value: Double) -> String {
+        loc.decimal(value, places: value == value.rounded() ? 0 : 1)
+    }
+}
+

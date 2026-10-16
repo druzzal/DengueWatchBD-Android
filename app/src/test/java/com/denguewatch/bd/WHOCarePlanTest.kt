@@ -52,7 +52,12 @@ class WHOCarePlanTest {
 
     @Test
     fun `a warning sign means hospital assessment`() {
-        assertEquals(Group.REFERRAL, plan(setOf("fever", "abdominal")).group)
+        // WHO 2025 lists the warning signs, and being unable to drink, among
+        // the reasons clinicians admit.
+        for (sign in listOf("abdominal", "vomiting", "oralIntolerance", "bleeding", "fatigue",
+                            "fluid", "noUrine")) {
+            assertEquals(sign, Group.REFERRAL, plan(setOf("fever", sign)).group)
+        }
     }
 
     @Test
@@ -61,13 +66,32 @@ class WHOCarePlanTest {
     }
 
     @Test
-    fun `a higher risk condition alone means assessment`() {
-        val plan = plan(
-            setOf("fever"),
-            context = TriageEngine.Context(isPregnant = true),
-        )
+    fun `pregnancy alone means hospital assessment`() {
+        // WHO 2025 lists pregnancy on its own among the criteria to admit.
+        val plan = plan(setOf("fever"), context = TriageEngine.Context(isPregnant = true))
         assertEquals(Group.REFERRAL, plan.group)
-        assertTrue(Reason.CO_MORBIDITY in plan.reasons)
+        assertTrue(Reason.PREGNANCY in plan.reasons)
+    }
+
+    @Test
+    fun `age and long-term conditions still mean assessment`() {
+        for (context in listOf(TriageEngine.Context(isUnderFiveOrOverSixty = true),
+                               TriageEngine.Context(hasChronicCondition = true))) {
+            val plan = plan(setOf("fever"), context = context)
+            assertEquals(Group.REFERRAL, plan.group)
+            assertTrue(Reason.HIGHER_RISK_GROUP in plan.reasons)
+        }
+    }
+
+    /**
+     * WHO 2025 names a second infection as raising the risk of severe disease,
+     * not as a reason to admit. It is said, and it moves nothing.
+     */
+    @Test
+    fun `previous dengue is a reason but not a move`() {
+        val plan = plan(setOf("fever"), context = TriageEngine.Context(hadDengueBefore = true))
+        assertEquals(Group.HOME, plan.group)
+        assertEquals(listOf(Reason.PREVIOUS_DENGUE), plan.reasons)
     }
 
     // MARK: - Measured signs
@@ -210,8 +234,8 @@ class WHOCarePlanTest {
      */
     @Test
     fun `the advice names the drugs to avoid and gives no doses`() {
-        val joined = (1..4)
-            .mapNotNull { Strings.english["who.group.home.advice$it"] }
+        val joined = Group.HOME.adviceKeys
+            .mapNotNull { Strings.english[it] }
             .joinToString(" ")
             .lowercase()
         assertTrue(joined, joined.contains("aspirin"))
@@ -226,6 +250,31 @@ class WHOCarePlanTest {
     fun `the source line disclaims diagnosis`() {
         val source = (Strings.english["who.plan.source"] ?: "").lowercase()
         assertTrue(source, source.contains("who"))
+        assertTrue("cites the current guideline: $source", source.contains("2025"))
         assertTrue(source, source.contains("does not decide whether you have dengue"))
+    }
+
+    /**
+     * The 2009 letters must not survive the move to the 2025 guideline: a
+     * clinician reading "Group B" would look for a classification WHO no
+     * longer uses.
+     */
+    @Test
+    fun `no group is titled with a 2009 letter`() {
+        for (group in Group.entries) {
+            for (table in listOf(Strings.english, Strings.bangla)) {
+                val title = table[group.titleKey].orEmpty()
+                assertFalse(title, title.contains("Group") || title.contains("গ্রুপ"))
+            }
+        }
+    }
+
+    /** WHO 2025 advises against steroids at home, and leads with measured oral fluids. */
+    @Test
+    fun `the home advice carries the 2025 recommendations`() {
+        val home = Group.HOME.adviceKeys.mapNotNull { Strings.english[it] }.joinToString(" ").lowercase()
+        assertTrue(home, home.contains("steroid"))
+        assertTrue(home, home.contains("measure"))
+        assertTrue(home, home.contains("4 to 6 times a day"))
     }
 }

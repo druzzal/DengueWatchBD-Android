@@ -16,6 +16,12 @@ extension UIColor {
 }
 
 extension Color {
+    /// A fixed colour, the same in both appearances. Used by the Broadsheet
+    /// tokens, which describe a printed page and have no dark variant.
+    init(hex: String) { self.init(uiColor: UIColor(hex: hex)) }
+}
+
+extension Color {
     /// A colour with separately chosen light and dark steps. Dark mode is a
     /// selected palette, never an automatic flip of the light one.
     init(light: String, dark: String) {
@@ -79,7 +85,13 @@ enum Palette {
             : UIColor(hex: "#0B0B14").withAlphaComponent(0.055)
     })
 
-    static let accent = cases
+    /// The app's theme colour: cyan, and dark enough to be legible as text.
+    ///
+    /// Measured, not picked by eye: #0088b0 is the cyan you reach for first
+    /// and it reaches only 4.08:1 on white, under the 4.5:1 small-text bar.
+    /// This step measures 4.93:1 on white and 4.52:1 on the plane, so a link
+    /// or a button label set in it is readable everywhere it appears.
+    static let accent = Color(light: "#007a9c", dark: "#3fc4ea")
     static let upIsBad = Color(light: "#b3261e", dark: "#f87171")
     static let downIsGood = Color(light: "#0f6b30", dark: "#4ade80")
 

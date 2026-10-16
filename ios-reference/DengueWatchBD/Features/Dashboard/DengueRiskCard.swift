@@ -18,6 +18,18 @@ struct DengueRiskCard: View {
     /// 14-day cases per 100,000 — spoken, since the meter is decorative.
     var incidence: Double?
     var isNationwide = false
+    /// True when the area came from the phone's position rather than from a
+    /// choice the reader made. Worth saying: "Dhaka North" means one thing if
+    /// they picked it and another if they are standing in it.
+    var isCurrentLocation = false
+    /// How many people this one figure is averaged over, already formatted.
+    ///
+    /// Shown only when the area came from the phone's position. A reader who
+    /// chose "Chattogram" knows they chose a division; a reader standing in
+    /// Cox's Bazar is shown "Chattogram" and has every reason to read it as
+    /// their town. DGHS reports ten areas for the whole country, and the card
+    /// should not imply a resolution the source does not have.
+    var coverage: String?
     var onTap: () -> Void
 
     @State private var pulsing = false
@@ -42,15 +54,18 @@ struct DengueRiskCard: View {
                 header
                 riskWord
                 RiskMeter(risk: risk, height: 7)
-                // Capped at large text sizes: unbounded, the advice pushed the
-                // trend and the timestamp off-screen entirely. The full wording
-                // is one tap away in the detail sheet, which the chevron and
-                // the accessibility hint both advertise.
+                // Never truncated. This was capped to three lines at large text
+                // sizes, to stop the advice pushing the trend and the timestamp
+                // down — but the card sits in a scroll view, so "pushed off
+                // screen" only ever meant "scroll", while the cap cost the
+                // reader the end of the sentence: "Use repellent and chec…".
+                // Losing the actionable half of a line of health advice is a
+                // worse trade than a taller card, and it fell hardest on the
+                // readers who set a large type size in the first place.
                 Text(loc.t(risk.guidanceKey))
                     .typo(.callout)
                     .foregroundStyle(.primary.opacity(0.85))
-                    .lineLimit(typeSize.isAccessibilitySize ? 3 : nil)
-                    .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize ? false : true)
+                    .fixedSize(horizontal: false, vertical: true)
                 footer
             }
             .padding(Space.card + 4)
@@ -134,10 +149,24 @@ struct DengueRiskCard: View {
                     .accessibilityHidden(true)
             }
 
-            Text(areaName)
-                .typo(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            HStack(spacing: 4) {
+                if isCurrentLocation {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                Text(areaName)
+                    .typo(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            if let coverage {
+                Text(coverage)
+                    .typo(.micro)
+                    .foregroundStyle(Palette.mutedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -178,12 +207,19 @@ struct DengueRiskCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var locationPhrase: String {
+        isCurrentLocation ? loc.t("risk.card.hereNow", areaName) : areaName
+    }
+
     private var accessibilitySummary: String {
         var parts = [
             loc.t("risk.card.title"),
             loc.t(risk.labelKey),
-            areaName,
+            locationPhrase,
         ]
+        if let coverage {
+            parts.append(coverage)
+        }
         if let incidence {
             parts.append(loc.t("risk.a11y.rate", loc.decimal(incidence)))
         }

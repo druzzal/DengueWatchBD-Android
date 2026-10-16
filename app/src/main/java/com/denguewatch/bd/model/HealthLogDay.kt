@@ -3,8 +3,8 @@ package com.denguewatch.bd.model
 import java.util.Calendar
 
 /**
- * One day of the reader's measurements: the readings they took and the lab
- * reports they were given, together.
+ * One day of the reader's measurements: the readings they took, the lab
+ * reports they were given and the fluids they logged, together.
  *
  * Two separate stores, which is right — a blood pressure and a blood count are
  * taken at different moments. But a person looking back at an illness, or
@@ -23,8 +23,16 @@ data class HealthLogDay(
     /** Newest first, matching the stores. */
     val vitals: List<VitalsEntry>,
     val labs: List<LabReport>,
+    /**
+     * Oldest first. Kept out of [itemsNewestFirst]: a day's fluids are read as
+     * totals, not as a dozen cups interleaved with a blood count.
+     */
+    val fluids: List<FluidEntry> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = vitals.isEmpty() && labs.isEmpty()
+    val isEmpty: Boolean get() = vitals.isEmpty() && labs.isEmpty() && fluids.isEmpty()
+
+    /** Whether the day holds any reading that can be normal or not. */
+    val hasReadings: Boolean get() = vitals.isNotEmpty() || labs.isNotEmpty()
 
     /** Everything recorded that day, newest first, so a day reads as one list. */
     val itemsNewestFirst: List<Item>
@@ -96,7 +104,7 @@ data class HealthLogDay(
 object HealthLog {
 
     /**
-     * Groups the two measurement stores by calendar day, newest day first.
+     * Groups the measurement stores by calendar day, newest day first.
      *
      * Days with nothing in them are absent rather than empty: a gap in the
      * record is a day the reader did not write anything down, and inventing a
@@ -105,17 +113,20 @@ object HealthLog {
     fun days(
         vitals: List<VitalsEntry>,
         labs: List<LabReport> = emptyList(),
+        fluids: List<FluidEntry> = emptyList(),
     ): List<HealthLogDay> {
         val vitalsByDay = vitals.groupBy { startOfDay(it.dateMillis) }
         val labsByDay = labs.groupBy { startOfDay(it.dateMillis) }
+        val fluidsByDay = fluids.groupBy { startOfDay(it.dateMillis) }
 
-        return (vitalsByDay.keys + labsByDay.keys)
+        return (vitalsByDay.keys + labsByDay.keys + fluidsByDay.keys)
             .sortedDescending()
             .map { day ->
                 HealthLogDay(
                     dateMillis = day,
                     vitals = vitalsByDay[day].orEmpty().sortedByDescending { it.dateMillis },
                     labs = labsByDay[day].orEmpty().sortedByDescending { it.dateMillis },
+                    fluids = fluidsByDay[day].orEmpty().sortedBy { it.dateMillis },
                 )
             }
     }

@@ -55,6 +55,10 @@ object TriageEngine {
 
         Symptom("abdominal", Symptom.Group.WARNING),
         Symptom("vomiting", Symptom.Group.WARNING),
+        // WHO 2025 lists oral intolerance as a reason to admit in its own
+        // right. It used to ride along in the vomiting row's small print, where
+        // someone who simply cannot drink — without vomiting — would not find it.
+        Symptom("oralIntolerance", Symptom.Group.WARNING),
         Symptom("bleeding", Symptom.Group.WARNING),
         Symptom("fatigue", Symptom.Group.WARNING),
         Symptom("fluid", Symptom.Group.WARNING),
@@ -70,8 +74,10 @@ object TriageEngine {
     fun symptom(id: String) = symptoms.firstOrNull { it.id == id }
 
     /**
-     * Higher-risk groups per WHO dengue guidance — they shift borderline
-     * results up a level.
+     * Higher-risk groups per WHO dengue guidance.
+     *
+     * Source: WHO, *Guidelines for clinical management of arboviral diseases:
+     * dengue, chikungunya, Zika and yellow fever* (2025), section 2.6.
      */
     data class Context(
         val feverDaysAgo: Int? = null,
@@ -80,9 +86,18 @@ object TriageEngine {
         val hasChronicCondition: Boolean = false,
         val hadDengueBefore: Boolean = false,
     ) {
-        val hasCoMorbidity: Boolean
-            get() = isPregnant || isUnderFiveOrOverSixty ||
-                hasChronicCondition || hadDengueBefore
+        /**
+         * The groups WHO 2025 names when it lists who is admitted: pregnancy
+         * outright, and the extremes of age and underlying conditions as
+         * patients clinicians "may elect to admit".
+         *
+         * Previous dengue is deliberately not here. WHO names a second
+         * infection as raising the risk of severe disease, not as a reason to
+         * admit, so it is shown as a reason to watch closely and changes no
+         * advice on its own.
+         */
+        val isHigherRiskGroup: Boolean
+            get() = isPregnant || isUnderFiveOrOverSixty || hasChronicCondition
     }
 
     fun evaluate(selected: Set<String>, context: Context): TriageOutcome {
@@ -92,19 +107,27 @@ object TriageEngine {
         val warnings = chosen.count { it.group == Symptom.Group.WARNING }
         if (warnings >= 1) return TriageOutcome.SEE_DOCTOR_TODAY
 
-        val core = chosen.count { it.group == Symptom.Group.CORE }
-        val hasFever = "fever" in selected
+        // Anyone in a group WHO would consider admitting is seen the same day,
+        // whatever the symptoms. This keeps the result in step with the care
+        // plan, which already sends these groups for hospital assessment — the
+        // two used to disagree for a pregnant reader with a fever alone.
+        if (context.isHigherRiskGroup && chosen.isNotEmpty()) return TriageOutcome.SEE_DOCTOR_TODAY
 
-        if (hasFever && core >= 2) {
-            return if (context.hasCoMorbidity) {
-                TriageOutcome.SEE_DOCTOR_TODAY
-            } else {
-                TriageOutcome.TEST_ADVISED
-            }
-        }
-        if (hasFever) return TriageOutcome.TEST_ADVISED
-        if (core >= 2) return TriageOutcome.TEST_ADVISED
+        val core = chosen.count { it.group == Symptom.Group.CORE }
+        if ("fever" in selected || core >= 2) return TriageOutcome.TEST_ADVISED
         return TriageOutcome.SELF_CARE
+    }
+
+    /**
+     * True when a same-day result came from the reader's risk group rather
+     * than from a warning sign they ticked, so the result can say which.
+     * "You reported a warning sign" to someone who reported none reads as the
+     * app not listening.
+     */
+    fun isRaisedByRiskGroup(selected: Set<String>, context: Context): Boolean {
+        val chosen = symptoms.filter { it.id in selected }
+        return evaluate(selected, context) == TriageOutcome.SEE_DOCTOR_TODAY &&
+            chosen.none { it.group == Symptom.Group.WARNING }
     }
 
     /**

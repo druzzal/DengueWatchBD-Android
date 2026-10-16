@@ -34,7 +34,7 @@ import com.denguewatch.bd.ui.theme.Typo
 import com.denguewatch.bd.ui.theme.typo
 
 /**
- * The WHO management group the reader's own record falls in, what WHO advises
+ * Where WHO's guidance puts the reader's own record, what WHO advises
  * for it, and — always — what produced it.
  *
  * The reasons are not decoration. A plan that says "go to hospital" without
@@ -56,6 +56,11 @@ fun WHOCarePlanCard(
     notableLabs: String?,
     onRecheck: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * The haematocrit has risen on each of the last two reports. Named for the
+     * doctor, like [notableLabs], and never folded into the group.
+     */
+    haematocritRising: Boolean = false,
 ) {
     val loc = LocalLocalization.current
     val colors = Dw.colors
@@ -83,12 +88,21 @@ fun WHOCarePlanCard(
             Reasons(plan)
         }
 
+        if (haematocritRising) {
+            InlineNote(
+                detail = loc.t("care.plan.haematocritRising"),
+                icon = DwIcons.trendUp,
+                tint = colors.riskInk(RiskLevel.HIGH),
+            )
+        }
         if (notableLabs != null) {
             InlineNote(
                 detail = loc.t("care.plan.readings", notableLabs),
                 icon = DwIcons.riskHigh,
                 tint = colors.riskInk(RiskLevel.HIGH),
             )
+        }
+        if (notableLabs != null || haematocritRising) {
             // Only where a lab value is on the card: this is the one place a
             // reader could reasonably assume their blood count moved the
             // group. It did not.
@@ -115,8 +129,9 @@ fun WHOCarePlanCard(
 }
 
 /**
- * The group, stated with WHO's own letter so a clinician here recognises it on
- * sight.
+ * The level, drawn and named. The A / B / C letters went with WHO's 2009
+ * groups: the 2025 guideline has no letters, and printing one would send a
+ * clinician looking for a classification that no longer exists.
  */
 @Composable
 private fun Header(plan: WHOCarePlan, risk: RiskLevel) {
@@ -138,11 +153,11 @@ private fun Header(plan: WHOCarePlan, risk: RiskLevel) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                plan.group.letter,
-                style = typo(Typo.TITLE, FontWeight.Bold),
-                color = colors.riskInk(risk),
-                modifier = Modifier.clearAndSetSemantics { },
+            Icon(
+                plan.group.icon,
+                contentDescription = null,
+                tint = colors.riskInk(risk),
+                modifier = Modifier.size(26.dp).clearAndSetSemantics { },
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -217,3 +232,10 @@ private fun ColumnScope.Reasons(plan: WHOCarePlan) {
         }
     }
 }
+
+private val WHOCarePlan.Group.icon
+    get() = when (this) {
+        WHOCarePlan.Group.HOME -> DwIcons.careHome
+        WHOCarePlan.Group.REFERRAL -> DwIcons.careHospital
+        WHOCarePlan.Group.EMERGENCY -> DwIcons.careEmergency
+    }

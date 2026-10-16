@@ -41,8 +41,13 @@ final class FeedDecodingTests: XCTestCase {
            {"title":"Age group distribution of affected cases from 1 January to till date in 2026",
             "headers":["Age Group","Male","Female","Total"],
             "rows":[{"Age Group":"0-5","Male":30,"Female":20,"Total":50},
+                    {"Age Group":"0-10","Male":1,"Female":0,"Total":1},
+                    {"Age Group":"06-10","Male":40,"Female":30,"Total":70},
                     {"Age Group":"42309","Male":1,"Female":1,"Total":2},
                     {"Age Group":"","Male":1,"Female":0,"Total":1},
+                    {"Age Group":"56-60","Male":5,"Female":5,"Total":10},
+                    {"Age Group":"6-10","Male":1,"Female":0,"Total":1},
+                    {"Age Group":"76-80","Male":3,"Female":2,"Total":5},
                     {"Age Group":"80+","Male":2,"Female":1,"Total":3},
                     {"Age Group":"Grand Total","Male":34,"Female":22,"Total":56}]}
          ]}
@@ -160,14 +165,118 @@ final class FeedDecodingTests: XCTestCase {
     }
 
     /// DGHS's age tables carry rows where a date was typed into the age column
-    /// ("42309", an Excel serial) and blank rows. Neither is an age band.
+    /// ("42309", an Excel serial from a spreadsheet reading "6-10" as the sixth
+    /// of October) and blank rows. Neither is an age band.
     @MainActor
     func testAgeBandsDropSourceGlitches() async throws {
         let store = DengueStore()
         await store.apply(document: try decoded(), source: .bundled)
 
-        XCTAssertEqual(store.ageBandsCases.map(\.label), ["0-5", "80+"])
+        XCTAssertFalse(store.ageBandsCases.contains { $0.lowerAge > 120 },
+                       "an Excel serial is not an age")
         XCTAssertEqual(store.ageBandsCases.first?.total, 50)
+    }
+
+    /// DGHS spells one band two ways — "06-10" and "6-10" — and both arrive as
+    /// separate rows. They are the same ten-year-olds, and a row of 1 beside a
+    /// row of 70 reads as a distinct group rather than as a typo.
+    @MainActor
+    func testTheTwoSpellingsOfOneBandBecomeOneRow() async throws {
+        let store = DengueStore()
+        await store.apply(document: try decoded(), source: .bundled)
+
+        let bands = store.ageBandsCases.filter { $0.lowerAge == 6 }
+        XCTAssertEqual(bands.count, 1, "06-10 and 6-10 are one band")
+        XCTAssertEqual(bands.first?.male, 41, "40 + 1")
+        XCTAssertEqual(bands.first?.female, 30)
+    }
+
+    /// The source sheet is sorted as text, which puts "6-10" between "56-60"
+    /// and "61-65". Age bands have to read in age order.
+    @MainActor
+    func testAgeBandsReadInAgeOrder() async throws {
+        let store = DengueStore()
+        await store.apply(document: try decoded(), source: .bundled)
+
+        XCTAssertEqual(store.ageBandsCases.map(\.lowerAge), [0, 6, 56, 76, 80])
+    }
+
+    /// DGHS's sheet carries rows spanning bands it already publishes — "0-10"
+    /// beside "0-5" and "06-10" — with a case or two against thousands. They
+    /// cannot be placed among the bands they cover, and left in they sit next
+    /// to the real rows looking like real age groups.
+    @MainActor
+    func testARowSpanningPublishedBandsIsDropped() async throws {
+        let store = DengueStore()
+        await store.apply(document: try decoded(), source: .bundled)
+
+        XCTAssertFalse(store.ageBandsCases.contains { $0.lowerAge == 0 && $0.upperAge == 10 },
+                       "0-10 covers two published bands and is not one itself")
+        XCTAssertEqual(store.ageBandsCases.filter { $0.lowerAge == 0 }.count, 1,
+                       "one band starts at zero, not two")
+    }
+
+    /// The band it spans must survive, with its own count untouched.
+    @MainActor
+    func testTheBandsItSpannedAreKept() async throws {
+        let store = DengueStore()
+        await store.apply(document: try decoded(), source: .bundled)
+
+        XCTAssertEqual(store.ageBandsCases.first { $0.lowerAge == 0 }?.total, 50)
+        XCTAssertEqual(store.ageBandsCases.first { $0.lowerAge == 6 }?.total, 71, "70 + 1")
+    }
+
+    /// "76-80" and "80+" share the endpoint 80 in DGHS's own scheme. Neither
+    /// spans the other, and dropping either would lose a real age group.
+    @MainActor
+    func testBandsSharingAnEndpointAreBothKept() async throws {
+        let store = DengueStore()
+        await store.apply(document: try decoded(), source: .bundled)
+
+        XCTAssertNotNil(store.ageBandsCases.first { $0.lowerAge == 76 && $0.upperAge == 80 })
+        XCTAssertNotNil(store.ageBandsCases.first { $0.lowerAge == 80 && $0.upperAge == nil })
+    }
+
+    /// Two bands that begin at the same age are still two bands. Keyed on
+    /// where they start, SwiftUI drew one of them twice and dropped the other.
+    func testBandsSharingALowerAgeHaveDifferentIdentities() {
+        let a = AgeBand(lowerAge: 21, upperAge: 25, male: 1, female: 1, total: 1 + 1)
+        let b = AgeBand(lowerAge: 21, upperAge: 30, male: 1, female: 1, total: 1 + 1)
+        let top = AgeBand(lowerAge: 80, upperAge: nil, male: 1, female: 1, total: 1 + 1)
+
+        XCTAssertNotEqual(a.id, b.id)
+        XCTAssertNotEqual(a.id, top.id)
+        XCTAssertEqual(a.id, AgeBand(lowerAge: 21, upperAge: 25,
+                                     male: 9, female: 9, total: 18).id,
+                       "the same span is the same row, whatever its counts")
+    }
+
+    @MainActor
+    func testEveryBandOnTheCardHasItsOwnIdentity() async throws {
+        let store = DengueStore()
+        await store.apply(document: try decoded(), source: .bundled)
+
+        let ids = store.ageBandsCases.map(\.id)
+        XCTAssertEqual(Set(ids).count, ids.count, "a ForEach needs one id per row")
+    }
+
+    @MainActor
+    func testTheOpenEndedTopBandHasNoUpperAge() async throws {
+        let store = DengueStore()
+        await store.apply(document: try decoded(), source: .bundled)
+
+        let top = store.ageBandsCases.last
+        XCTAssertEqual(top?.lowerAge, 80)
+        XCTAssertNil(top?.upperAge, "80+ has no top")
+        XCTAssertEqual(top?.label(NumberStyle(language: .english)), "80+")
+    }
+
+    /// The source only ever publishes Western numerals; a Bengali reader should
+    /// not meet them in the middle of a Bengali screen.
+    func testAgeBandLabelsUseTheReadersDigits() {
+        let band = AgeBand(lowerAge: 6, upperAge: 10, male: 1, female: 1, total: 1 + 1)
+        XCTAssertEqual(band.label(NumberStyle(language: .english)), "6–10")
+        XCTAssertEqual(band.label(NumberStyle(language: .bangla)), "৬–১০")
     }
 
     @MainActor
@@ -177,7 +286,7 @@ final class FeedDecodingTests: XCTestCase {
 
         XCTAssertEqual(store.seasonCases, 300)
         XCTAssertEqual(store.seasonDeaths, 6)
-        XCTAssertEqual(store.cases24h, 988)
+        XCTAssertEqual(store.snapshot.last24Cases, 988)
         XCTAssertEqual(store.headline?.epiWeek, "W35")
         XCTAssertEqual(store.sexSplitCases?.male, 180)
     }
@@ -206,6 +315,52 @@ final class FeedDecodingTests: XCTestCase {
     }
 
     // MARK: - Risk
+
+    // MARK: - Per-week risk colouring on the area chart
+
+    private func area(weeklyCases: [Int], populationThousands: Int) -> Area {
+        Area(code: "TEST", name: "Test", division: .dhaka,
+             latitude: 23.8, longitude: 90.4,
+             populationThousands: populationThousands,
+             seasonCases: weeklyCases.reduce(0, +), seasonDeaths: 0,
+             weeklyCases: weeklyCases, weeklyIsApportioned: false,
+             geofenceRadiusMeters: 12000)
+    }
+
+    /// Each bar is banded on a fortnight, not on its own week. Banding a single
+    /// week with thresholds calibrated for two would read about half the true
+    /// rate and paint a severe week as merely high.
+    func testWeeklyRiskUsesTheTwoWeekWindow() {
+        // 1,000k people. Weeks of 300 each: one week alone is 30/100k
+        // (High), but the two-week window is 60/100k — Severe.
+        let a = area(weeklyCases: [300, 300], populationThousands: 1_000)
+        XCTAssertEqual(RiskLevel(incidencePer100k: 30), .high, "a single week would read High")
+        XCTAssertEqual(a.risk(atWeekIndex: 1), .severe, "the fortnight is what counts")
+    }
+
+    func testWeeklyRiskTracksTheSeriesRatherThanTheCurrentBand() {
+        // Quiet early weeks then a surge: early bars must not inherit the
+        // area's present risk, or every bar would be one flat colour.
+        let a = area(weeklyCases: [1, 1, 400, 400], populationThousands: 1_000)
+        XCTAssertEqual(a.risk(atWeekIndex: 1), .low)
+        XCTAssertEqual(a.risk(atWeekIndex: 3), .severe)
+        XCTAssertEqual(a.risk, a.risk(atWeekIndex: a.weeklyCases.count - 1),
+                       "the last bar should agree with the area's badge")
+    }
+
+    func testWeeklyRiskHandlesEdgesWithoutCrashing() {
+        // A lone first week bands on itself: 500 cases in 1,000k is 50/100k,
+        // which is High. Had a prior week of the same size existed the
+        // fortnight would be 100/100k and Severe — so the first bar of any
+        // series reads low by construction. A known floor, documented on the
+        // method, not a claim about that week.
+        let a = area(weeklyCases: [500], populationThousands: 1_000)
+        XCTAssertEqual(a.risk(atWeekIndex: 0), .high, "a lone first week bands on itself")
+        XCTAssertEqual(a.risk(atWeekIndex: 99), .low, "out of range is not a crash")
+        XCTAssertEqual(a.risk(atWeekIndex: -1), .low)
+        let noPeople = area(weeklyCases: [10, 10], populationThousands: 0)
+        XCTAssertEqual(noPeople.risk(atWeekIndex: 1), .low, "no population means no rate")
+    }
 
     func testRiskBandsAreCalibratedForATwoWeekWindow() {
         XCTAssertEqual(RiskLevel(incidencePer100k: 0.3), .low)

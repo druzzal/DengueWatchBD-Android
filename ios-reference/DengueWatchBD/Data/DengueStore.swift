@@ -65,6 +65,7 @@ final class DengueStore {
     func refresh() async {
         do {
             apply(try bundled.load())
+            source = bundled.isServingDownloadedData ? .network : .bundled
             state = .loaded
         } catch {
             // A failed refresh is no reason to blank a screen that already has
@@ -91,7 +92,8 @@ final class DengueStore {
 
         national = Self.dailySeries(from: document)
         epiWeeks = document.chart(.divisionCasesByWeek)?.categories ?? []
-        areas = Self.areas(from: document, weekCount: epiWeeks.count)
+        areas = Self.areas(from: document, weekCount: epiWeeks.count,
+                           latestWeekIsPartial: Self.latestWeekIsPartial(document, daily: national))
         history = Self.history(from: document)
         ageBandsCases = Self.ageBands(in: document, titled: "affected cases from 1 January")
         sexSplitCases = Self.sexSplit(document.chart(.casesByGender))
@@ -124,7 +126,37 @@ final class DengueStore {
         }
     }
 
-    private static func areas(from document: FeedDocument, weekCount: Int) -> [Area] {
+    /// Whether the newest EPI week in the weekly breakdown is still open.
+    ///
+    /// DGHS's EPI weeks run Sunday to Saturday (week 41 of 2026 is 11–17
+    /// October), and the weekly series carries the current week as far as it
+    /// has got. So unless the report is a Saturday's, the last entry is a few
+    /// days of cases, not a week of them.
+    ///
+    /// The weekday alone would also drop a complete week on the day the
+    /// weekly table lags the daily one, so the last week's national total is
+    /// checked against the days reported so far: it is the open week only if
+    /// it matches those days better than it matches the seven before them.
+    static func latestWeekIsPartial(_ document: FeedDocument, daily: [DailyPoint]) -> Bool {
+        guard let reportDay = daily.last?.date,
+              let weekly = document.chart(.divisionCasesByWeek),
+              !weekly.categories.isEmpty else { return false }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Dhaka") ?? .gmt
+        // Sunday is 1, so this is also how many days of the week are in.
+        let daysIn = calendar.component(.weekday, from: reportDay)
+        guard daysIn < 7 else { return false }
+
+        let lastIndex = weekly.categories.count - 1
+        let weekTotal = weekly.series.reduce(0) { $0 + ($1.values[safe: lastIndex] ?? 0) }
+        let cases = daily.map(\.cases)
+        let soFar = Series.sum(Array(cases.suffix(daysIn)))
+        let weekBefore = Series.sum(Array(cases.dropLast(daysIn).suffix(7)))
+        return abs(weekTotal - soFar) < abs(weekTotal - weekBefore)
+    }
+
+    private static func areas(from document: FeedDocument, weekCount: Int,
+                              latestWeekIsPartial: Bool = false) -> [Area] {
         let seasonCases = document.chart(.areaSeasonCases)
         let seasonDeaths = document.chart(.areaSeasonDeaths)
         let weekly = document.chart(.divisionCasesByWeek)
@@ -181,7 +213,8 @@ final class DengueStore {
                 seasonDeaths: seasonDeaths?.value(for: definition.feedCategory) ?? 0,
                 weeklyCases: series,
                 weeklyIsApportioned: apportioned,
-                geofenceRadiusMeters: definition.geofenceRadiusMeters
+                geofenceRadiusMeters: definition.geofenceRadiusMeters,
+                latestWeekIsPartial: latestWeekIsPartial && !series.isEmpty
             )
         }
     }
@@ -210,24 +243,68 @@ final class DengueStore {
             ($0.title ?? "").localizedCaseInsensitiveContains(fragment)
         }) else { return [] }
 
-        return table.rows.compactMap { row in
-            guard let label = row["Age Group"]?.text, Self.isAgeBand(label) else { return nil }
-            return AgeBand(label: label,
-                           male: row["Male"]?.number ?? 0,
-                           female: row["Female"]?.number ?? 0)
+        // Merged by range and then put in age order. DGHS spells one band two
+        // ways — "06-10" and "6-10" — which arrive as separate rows, and their
+        // sheet is sorted as text, so the unpadded spelling lands between
+        // "56-60" and "61-65". Summing the pair is right rather than merely
+        // tidy: they are the same ten-year-olds, and showing one row of 2,101
+        // beside another of 1 invites the reader to treat the second as a
+        // distinct group.
+        // The published Total is carried, not recomputed. DGHS's table counts
+        // cases whose sex was never recorded — they appear in Total and in
+        // neither Male nor Female — so male plus female is smaller than the
+        // band, and summing the two would quietly shrink every row.
+        var merged: [Range: (male: Int, female: Int, total: Int)] = [:]
+        for row in table.rows {
+            guard let text = row["Age Group"]?.text, let range = Self.ageRange(text) else { continue }
+            let male = row["Male"]?.number ?? 0
+            let female = row["Female"]?.number ?? 0
+            // A table without a Total column is not malformed, only older:
+            // fall back to the two sexes rather than reporting the band empty.
+            let total = row["Total"]?.number ?? (male + female)
+            merged[range, default: (0, 0, 0)].male += male
+            merged[range, default: (0, 0, 0)].female += female
+            merged[range, default: (0, 0, 0)].total += total
         }
+        let bands = merged
+            .map { AgeBand(lowerAge: $0.key.low, upperAge: $0.key.high,
+                           male: $0.value.male, female: $0.value.female,
+                           total: $0.value.total) }
+
+        // A row that spans bands the table already publishes is not a band.
+        // DGHS's sheet carries "0-10" beside "0-5" and "06-10", and "21-30"
+        // beside "21-25" and "26-30" — one case each, against thousands. They
+        // cannot be placed among the bands they cover, and left in they sit
+        // next to the real rows looking like real age groups, which is what a
+        // reader sees as the same data listed twice.
+        return bands
+            .filter { band in !bands.contains { band.spans($0) } }
+            .sorted { $0.lowerAge < $1.lowerAge }
     }
 
+    /// An age band's span, for merging spellings of the same one.
+    private struct Range: Hashable {
+        let low: Int
+        /// Nil for the open-ended top band.
+        let high: Int?
+    }
+
+    /// The span a label covers, or nil when the label is not an age band.
+    ///
     /// DGHS's age tables occasionally carry a row where a date was typed into
-    /// the age column ("42309" — an Excel serial) or left blank. Those are
-    /// dropped rather than rendered as an age band.
-    private static func isAgeBand(_ label: String) -> Bool {
-        if label == "80+" { return true }
-        let parts = label.split(separator: "-")
+    /// the age column ("42309" — an Excel serial, from a spreadsheet reading
+    /// "6-10" as the sixth of October) or left blank. Those are dropped rather
+    /// than rendered as an age band.
+    private static func ageRange(_ label: String) -> Range? {
+        let trimmed = label.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasSuffix("+"), let low = Int(trimmed.dropLast()) {
+            return Range(low: low, high: nil)
+        }
+        let parts = trimmed.split(separator: "-")
         guard parts.count == 2,
               let low = Int(parts[0]), let high = Int(parts[1]),
-              low <= high, high <= 120 else { return false }
-        return true
+              low <= high, high <= 120 else { return nil }
+        return Range(low: low, high: high)
     }
 
     private static func sexSplit(_ chart: FeedChart?) -> SexSplit? {
@@ -277,9 +354,6 @@ final class DengueStore {
     /// case, but the headline is the figure of record.
     var seasonCases: Int { headline?.ytdCases ?? Series.sum(national.map(\.cases)) }
     var seasonDeaths: Int { headline?.ytdDeaths ?? Series.sum(national.map(\.deaths)) }
-
-    var cases24h: Int { headline?.last24Cases ?? national.last?.cases ?? 0 }
-    var deaths24h: Int { headline?.last24Deaths ?? national.last?.deaths ?? 0 }
 
 
     var last7Cases: Int { Series.sum(national.suffix(7).map(\.cases)) }
@@ -349,6 +423,15 @@ final class DengueStore {
     var areasByCases: [Area] { areas.sorted { $0.seasonCases > $1.seasonCases } }
     var areasByRisk: [Area] { areas.sorted { $0.incidencePer100k > $1.incidencePer100k } }
 
+    /// The home screen's national snapshot, with "unknown" kept distinct from
+    /// "zero". See `NationalSnapshot`.
+    var snapshot: NationalSnapshot {
+        NationalSnapshot.from(headline: headline,
+                              national: national,
+                              areas: areas,
+                              lastUpdated: lastUpdated)
+    }
+
     var hotspots: [Area] { areasByRisk.filter { $0.risk >= .high } }
 
     /// The hotspots to arm geofences against, or `nil` when there is no area
@@ -409,12 +492,12 @@ enum FeedDate {
         return formatter
     }()
 
-    private static let isoFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withFullDate]
-        formatter.timeZone = TimeZone(identifier: "Asia/Dhaka") ?? .gmt
-        return formatter
-    }()
+    /// A value type rather than a shared `ISO8601DateFormatter`: that class
+    /// holds mutable state, and one instance shared across actors is a data
+    /// race waiting for the day two parses overlap.
+    private static let isoStyle = Date.ISO8601FormatStyle(
+        timeZone: TimeZone(identifier: "Asia/Dhaka") ?? .gmt
+    ).year().month().day()
 
     /// `01-Jan-26` → that day.
     static func day(from label: String) -> Date? {
@@ -423,6 +506,6 @@ enum FeedDate {
 
     /// `2026-09-05` → that day.
     static func iso(from label: String) -> Date? {
-        isoFormatter.date(from: label)
+        try? Date(label, strategy: isoStyle)
     }
 }

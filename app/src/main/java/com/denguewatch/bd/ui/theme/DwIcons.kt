@@ -48,6 +48,10 @@ import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
@@ -69,6 +73,21 @@ import com.denguewatch.bd.model.RiskLevel
  * nearest one with the same shape.
  */
 object DwIcons {
+    // The WHO care plan's three levels, drawn rather than lettered: the 2025
+    // guideline has no A / B / C. A shape as well as a colour, so the level
+    // still reads in greyscale.
+    val careHome: ImageVector = Icons.Filled.Home
+    val careHospital: ImageVector = Icons.Filled.LocalHospital
+    val careEmergency: ImageVector = Icons.Filled.Dangerous
+
+    // The fluid log: a drink, and urine passed.
+    val drink: ImageVector = Icons.Filled.LocalCafe
+    val urine: ImageVector = Icons.Filled.WaterDrop
+    val add: ImageVector = Icons.Filled.AddCircle
+
+    /** Past symptom checks. */
+    val history: ImageVector = Icons.Filled.History
+
     // Risk scale. Four distinct silhouettes, so the shape carries the band as
     // well as the colour does — that pairing is the whole reason risk is never
     // shown as colour alone.

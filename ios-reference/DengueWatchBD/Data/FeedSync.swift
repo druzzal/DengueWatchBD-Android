@@ -74,8 +74,41 @@ final class FeedSync {
         hasStartedMonitoring = false
     }
 
-    /// `force` skips the minimum-interval check — used by pull-to-refresh.
+    /// Whether this call should talk to the server at all.
+    ///
+    /// Pure, and separate from `sync`, so the policy can be tested without
+    /// standing up a network: this decision is the difference between a reader
+    /// seeing today's figures and yesterday's.
+    ///
+    /// What it gates is the 350-byte probe. The full document has its own gate
+    /// — `fetchIfChanged` downloads only when the probe reports a report date
+    /// newer than the one on screen — so saying yes here is nearly free.
+    ///
+    /// Two questions, not one. Elapsed time alone would skip a check even when
+    /// the cache had gone missing, leaving the app quietly serving the bundled
+    /// seed despite a working connection. A skip is only safe when there is
+    /// actually a cached payload to fall back on.
+    static func shouldProbe(force: Bool,
+                            lastSuccess: Date?,
+                            hasCachedPayload: Bool,
+                            now: Date = Date()) -> Bool {
+        if force { return true }
+        guard let lastSuccess, hasCachedPayload else { return true }
+        let elapsed = now.timeIntervalSince(lastSuccess)
+        // A stored time in the future means the clock moved backwards — a
+        // manual change, a timezone correction on a phone that had drifted.
+        // Comparing against it would hold the check off until the clock caught
+        // up, which could be a day, and the reader would have no way to tell
+        // why the figures had stopped moving.
+        guard elapsed >= 0 else { return true }
+        return elapsed >= FeedConfig.minimumProbeInterval
+    }
+
+    /// `force` skips the probe floor — used by pull-to-refresh.
     func sync(force: Bool) async {
+        // Launch and the first scene activation both ask within the same
+        // moment; the second would only repeat the first one's requests.
+        guard status != .syncing else { return }
         guard let summaryEndpoint = FeedConfig.summaryEndpoint,
               let latestEndpoint = FeedConfig.latestEndpoint else {
             status = .bundledOnly
@@ -85,13 +118,10 @@ final class FeedSync {
             status = .offline
             return
         }
-        // The throttle asks two questions, not one. Elapsed time alone would
-        // skip a sync even when the cache had gone missing, leaving the app
-        // quietly serving the bundled seed despite a working connection. A skip
-        // is only safe when there is actually a cached payload to fall back on.
-        if !force, let last = lastSuccessfulSync,
-           Date().timeIntervalSince(last) < FeedConfig.minimumSyncInterval,
-           cache.cachedData != nil {
+        if !Self.shouldProbe(force: force,
+                             lastSuccess: lastSuccessfulSync,
+                             hasCachedPayload: cache.cachedData != nil),
+           let last = lastSuccessfulSync {
             status = .upToDate(last)
             return
         }
@@ -103,7 +133,16 @@ final class FeedSync {
                                             validators: cache.validators)
             let known = store?.meta?.lastUpdated
             switch try await service.fetchIfChanged(knownReportDate: known) {
-            case .notModified:
+            case .notModified(let reportDate):
+                // The server can say "nothing new" about a document this screen
+                // has never seen: a background refresh in this same process
+                // downloads into the cache, with its own store, and saves the
+                // new ETag. The next request here sends that ETag, gets a 304,
+                // and without this the reader keeps the old figures until the
+                // app is killed. The cache is the newer copy, so read it.
+                if let reportDate, reportDate != store?.meta?.lastUpdated {
+                    await store?.refresh()
+                }
                 lastSuccessfulSync = Date()
                 status = .upToDate(lastSuccessfulSync ?? Date())
             case .updated(let document, let data, let validators):

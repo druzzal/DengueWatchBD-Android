@@ -28,7 +28,7 @@ import com.denguewatch.bd.feature.shared.InlineNote
 import com.denguewatch.bd.feature.shared.ShrinkToFitText
 import com.denguewatch.bd.i18n.LocalLocalization
 import com.denguewatch.bd.model.DengueTest
-import com.denguewatch.bd.model.HealthLog
+import com.denguewatch.bd.feature.health.FluidDaySummary
 import com.denguewatch.bd.model.HealthLogDay
 import com.denguewatch.bd.model.LabMeasure
 import com.denguewatch.bd.model.LabReport
@@ -63,7 +63,7 @@ fun LogDayDetailScreen(
 ) {
     val loc = LocalLocalization.current
     val colors = Dw.colors
-    val day = HealthLog.days(state.vitals.entries, state.labs.reports)
+    val day = state.healthLogDays
         .firstOrNull { it.dateMillis == dayMillis }
 
     LazyColumn(
@@ -78,6 +78,16 @@ fun LogDayDetailScreen(
                 color = colors.secondaryText,
                 modifier = Modifier.padding(horizontal = Space.screen),
             )
+        }
+
+        // The day's fluids, as totals first: a doctor reads intake and urine
+        // against each other before reading the cups one by one.
+        day?.fluids?.takeIf { it.isNotEmpty() }?.let { fluids ->
+            item(key = "fluids") {
+                Card(Modifier.padding(horizontal = Space.screen)) {
+                    FluidDaySummary(state, fluids)
+                }
+            }
         }
 
         // Oldest first, deliberately: a day is read forwards.
@@ -204,7 +214,9 @@ private fun Header(title: String, time: String) {
  * Said in words as well as colour, and for every reading rather than only the
  * ones out of range: a log is read for which way things went — a platelet
  * count that fell, a fever that rose — and "Outside the usual range" could not
- * say which. A normal reading's word stays in neutral ink.
+ * say which. A reading is green in its usual range and amber to red outside
+ * it, as in My health; the word below says the same, so colour is never the
+ * only signal. A test result has no range, and stays in neutral ink.
  *
  * [side] is null for a test result, which has no range to fall either side of.
  */
@@ -220,8 +232,9 @@ private fun MeasureRow(
     val loc = LocalLocalization.current
     val colors = Dw.colors
     val ink = when {
-        status != MeasureStatus.NORMAL -> colors.riskInk(status.risk)
+        side != null -> colors.riskInk(status.risk)
         emphasise -> colors.riskInk(MeasureStatus.OUTSIDE.risk)
+        status != MeasureStatus.NORMAL -> colors.riskInk(status.risk)
         else -> colors.primaryText
     }
 
@@ -272,7 +285,7 @@ private fun MeasureRow(
             Text(
                 loc.t(side.labelKey),
                 style = typo(Typo.MICRO, FontWeight.SemiBold),
-                color = if (status == MeasureStatus.NORMAL) colors.secondaryText else ink,
+                color = ink,
             )
         }
     }

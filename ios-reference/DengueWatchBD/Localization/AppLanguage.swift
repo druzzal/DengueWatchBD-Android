@@ -31,6 +31,20 @@ enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// For controls that format their own text.
+    ///
+    /// Everything the app formats itself passes through `digits(_:)`, because
+    /// bn_BD gives Bengali month names and Latin numerals. A DatePicker draws
+    /// its own label and never reaches that, so the numbering system has to be
+    /// part of the locale handed to it — otherwise a Bengali form reads
+    /// "২৮ সেপ" nowhere and "28 সেপ, 2026" in its date field.
+    var pickerLocale: Locale {
+        switch self {
+        case .english: Locale(identifier: "en_BD")
+        case .bangla: Locale(identifier: "bn_BD@numbers=beng")
+        }
+    }
+
     /// Bengali readers expect Bengali digits; English readers expect Latin.
     var usesBengaliDigits: Bool { self == .bangla }
 }
@@ -42,6 +56,7 @@ struct NumberStyle: Sendable, Equatable {
     let language: AppLanguage
 
     var locale: Locale { language.locale }
+    var pickerLocale: Locale { language.pickerLocale }
 
     private func digits(_ text: String) -> String {
         guard language.usesBengaliDigits else { return text }
@@ -62,17 +77,24 @@ struct NumberStyle: Sendable, Equatable {
 
     /// Bengali uses হাজার / লাখ rather than k / M, because "১০১k" is not how
     /// anyone reads a number in Bengali.
+    ///
+    /// Each unit takes over from the value that would round up to it, so
+    /// 99,600 reads "১.০ লাখ" rather than "১০০ হাজার", and 999,600 "1.0M"
+    /// rather than "1000k".
     func compact(_ value: Int) -> String {
         switch language {
         case .english:
-            if value >= 1_000_000 { return String(format: "%.1fM", Double(value) / 1_000_000) }
-            if value >= 10_000 { return String(format: "%.0fk", Double(value) / 1_000) }
+            if value >= 999_500 { return String(format: "%.1fM", Double(value) / 1_000_000) }
+            if value >= 9_950 { return String(format: "%.0fk", Double(value) / 1_000) }
             if value >= 1_000 { return String(format: "%.1fk", Double(value) / 1_000) }
             return num(value)
         case .bangla:
-            if value >= 10_000_000 { return digits(String(format: "%.1f", Double(value) / 10_000_000)) + " কোটি" }
-            if value >= 100_000 { return digits(String(format: "%.1f", Double(value) / 100_000)) + " লাখ" }
-            if value >= 1_000 { return digits(String(format: "%.0f", Double(value) / 1_000)) + " হাজার" }
+            if value >= 9_995_000 { return digits(String(format: "%.1f", Double(value) / 10_000_000)) + " কোটি" }
+            if value >= 99_500 { return digits(String(format: "%.1f", Double(value) / 100_000)) + " লাখ" }
+            // One decimal below ten thousand, as English has: rounded whole,
+            // the map legend labelled a 1,500-case circle "১ হাজার".
+            if value >= 9_950 { return digits(String(format: "%.0f", Double(value) / 1_000)) + " হাজার" }
+            if value >= 1_000 { return digits(String(format: "%.1f", Double(value) / 1_000)) + " হাজার" }
             return num(value)
         }
     }
@@ -93,6 +115,56 @@ struct NumberStyle: Sendable, Equatable {
 
     func dateTime(_ date: Date) -> String {
         digits(date.formatted(.dateTime.day().month(.abbreviated).hour().minute().locale(locale)))
+    }
+
+    /// The date under "Today in Bangladesh", which Bangla sets month first.
+    ///
+    /// CLDR orders both bn_BD and en_BD day-first — chaining
+    /// `.month(.wide).day()` still yields "১২ সেপ্টেম্বর" — so the Bangla form
+    /// is an explicit pattern, set that way on the author's instruction rather
+    /// than derived. English keeps the locale's own order.
+    func reportedDate(_ date: Date) -> String {
+        guard language == .bangla else { return dayMonth(date) }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.dateFormat = "MMMM d"
+        return digits(formatter.string(from: date))
+    }
+
+
+    /// Clock time alone, for a record that already states the day.
+    func time(_ date: Date) -> String {
+        digits(date.formatted(.dateTime.hour().minute().locale(locale)))
+    }
+
+    /// Weekday-or-"today" plus the clock time.
+    ///
+    /// Health readings need the actual moment, not "2 hours ago": knowing a
+    /// temperature was taken at 3am rather than after lunch is the difference
+    /// between a fever chart that means something and one that does not. The
+    /// recent days are still named rather than dated, because "Today, 2:20 PM"
+    /// is read faster than "13 Sep, 2:20 PM" when it is in fact today.
+    func dayAndTime(_ date: Date, todayLabel: String, yesterdayLabel: String) -> String {
+        let calendar = Calendar.current
+        let time = digits(date.formatted(.dateTime.hour().minute().locale(locale)))
+        if calendar.isDateInToday(date) { return "\(todayLabel), \(time)" }
+        if calendar.isDateInYesterday(date) { return "\(yesterdayLabel), \(time)" }
+
+        let sameWeek = calendar.dateComponents([.day], from: date, to: Date()).day ?? 99
+        let day = sameWeek < 7
+            ? date.formatted(.dateTime.weekday(.wide).locale(locale))
+            : date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(locale))
+        return digits("\(day), \(time)")
+    }
+
+    /// Joins names the way the chosen language joins them, not the way the
+    /// device does. The in-app language toggle is independent of the system
+    /// locale, so `ListFormatter.localizedString(byJoining:)` drops an English
+    /// "and" into the middle of a Bengali sentence.
+    func list(_ items: [String]) -> String {
+        let formatter = ListFormatter()
+        formatter.locale = locale
+        return formatter.string(from: items) ?? items.joined(separator: ", ")
     }
 
     func relative(_ date: Date) -> String {
@@ -134,6 +206,7 @@ final class LocalizationManager {
     }
 
     var locale: Locale { language.locale }
+    var pickerLocale: Locale { language.pickerLocale }
 
     /// Hand this to anything nonisolated that needs to format — chart axes most of all.
     var style: NumberStyle { NumberStyle(language: language) }
@@ -156,6 +229,12 @@ final class LocalizationManager {
         String(format: t(key), locale: locale, arguments: arguments)
     }
 
+    /// Same substitution, for callers that already hold their arguments as a
+    /// list — the surveillance digest builds them programmatically.
+    func t(_ key: String, arguments: [String]) -> String {
+        String(format: t(key), locale: locale, arguments: arguments)
+    }
+
     // MARK: - Numbers and dates (delegated, so there is one implementation)
 
     func num(_ value: Int) -> String { style.num(value) }
@@ -165,5 +244,12 @@ final class LocalizationManager {
     func fullDate(_ date: Date) -> String { style.fullDate(date) }
     func dayMonth(_ date: Date) -> String { style.dayMonth(date) }
     func dateTime(_ date: Date) -> String { style.dateTime(date) }
+    func time(_ date: Date) -> String { style.time(date) }
+    func reportedDate(_ date: Date) -> String { style.reportedDate(date) }
     func relative(_ date: Date) -> String { style.relative(date) }
+
+    /// Day and clock time, with "Today"/"Yesterday" resolved from the tables.
+    func dayAndTime(_ date: Date) -> String {
+        style.dayAndTime(date, todayLabel: t("common.today"), yesterdayLabel: t("common.yesterday"))
+    }
 }

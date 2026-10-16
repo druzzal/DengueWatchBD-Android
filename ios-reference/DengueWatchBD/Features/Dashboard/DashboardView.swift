@@ -5,6 +5,7 @@ import MapKit
 /// current risk, then local activity, then the trend, then where it is
 /// spreading, then what to do about it.
 struct DashboardView: View {
+    @Environment(CaseLogStore.self) private var caseLog
     @Environment(DengueStore.self) private var store
     @Environment(Preferences.self) private var preferences
     @Environment(LocalizationManager.self) private var loc
@@ -14,23 +15,54 @@ struct DashboardView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.horizontalSizeClass) private var sizeClass
 
+    /// The gutter the per-100,000 rate sits in on a Top areas row.
+    ///
+    /// Measured on an iPhone 15 Pro Max: the widest English form,
+    /// "41.3 per 100,000", runs 116pt, and Bengali's "প্রতি লাখে ৪১.৩" is
+    /// shorter. 124pt clears both with room for a three-digit rate, and scales
+    /// with Dynamic Type — .micro resolves to the .caption text style, so the
+    /// gutter grows at the same rate as the words inside it.
+    @ScaledMetric(relativeTo: .caption) private var rateWidth: CGFloat = 124
+
     @State private var trendRange: TrendRange = .fortnight
     @State private var showingAbout = false
     @State private var showingRiskDetail = false
 
     /// The area the user is being told about: their chosen area, else the
     /// area they are standing in, else the country.
+    /// The area the hero reads for: where the reader is now when the phone can
+    /// say so, and their chosen area otherwise.
+    ///
+    /// Location comes first deliberately. "The risk here" is the question this
+    /// card answers, and someone who has travelled to a district with an
+    /// outbreak needs that district's reading, not the one they picked at home
+    /// last month. The card always names the area it is reading, so there is
+    /// no guessing which one is on screen.
     private var focusArea: Area? {
-        if let code = preferences.homeAreaCode, let area = store.area(code: code) {
+        if let here = location.lastKnownLocation, let area = store.nearestArea(to: here) {
             return area
         }
-        if let here = location.lastKnownLocation {
-            return store.nearestArea(to: here)
+        if let code = preferences.homeAreaCode, let area = store.area(code: code) {
+            return area
         }
         return nil
     }
 
+    /// True when the area on screen came from the phone's own position.
+    private var focusIsCurrentLocation: Bool {
+        guard let here = location.lastKnownLocation else { return false }
+        return store.nearestArea(to: here) != nil
+    }
+
     private var focusRisk: RiskLevel { focusArea?.risk ?? store.nationalRisk }
+
+    /// How many people the focus area's figure covers, when the area was found
+    /// from the phone rather than chosen. See `DengueRiskCard.coverage`.
+    private var focusCoverage: String? {
+        guard focusIsCurrentLocation, let focusArea else { return nil }
+        return loc.t("risk.card.covers",
+                     loc.compact(focusArea.populationThousands * 1_000))
+    }
 
     private var focusAreaName: String {
         if let focusArea {
@@ -90,6 +122,14 @@ struct DashboardView: View {
                 await sync.sync(force: true)
                 await store.refresh()
             }
+            .task {
+                // Ask for a fix. If permission has not been given yet this
+                // records the want rather than prompting — the card below does
+                // the asking, with an explanation — and the fix is delivered
+                // the moment access is granted, without the reader having to
+                // leave the tab and come back.
+                location.requestOneFix()
+            }
             .navigationDestination(for: Area.self) { AreaDetailView(area: $0) }
             .sheet(isPresented: $showingAbout) { AboutDataView() }
             .sheet(isPresented: $showingRiskDetail) {
@@ -136,6 +176,8 @@ struct DashboardView: View {
     private var loadedContent: some View {
         riskSection
         activitySection
+        whatChangedSection
+        topAreasSection
         trendSection
         mapSection
         provenanceSection
@@ -146,20 +188,29 @@ struct DashboardView: View {
             DengueRiskCard(
                 risk: focusRisk,
                 areaName: focusAreaName,
-                change: focusArea?.weeklyChange ?? store.weeklyCaseChange,
+                // An area with no prior week has no trend; it must not borrow
+                // the national one under its own name.
+                change: focusArea.map(\.weeklyChange) ?? store.weeklyCaseChange,
                 lastUpdated: store.lastUpdated,
                 incidence: focusArea?.incidencePer100k ?? nationalIncidence,
                 isNationwide: focusArea == nil,
+                isCurrentLocation: focusIsCurrentLocation,
+                coverage: focusCoverage,
                 onTap: {
                     Haptic.selection()
                     showingRiskDetail = true
                 }
             )
 
-            if focusArea == nil {
-                // Without a area the reading is national, which is much
-                // less useful than a local one. Offer the fix rather than
-                // silently showing a country-wide number.
+            if focusArea == nil, location.authorization != .authorizedWhenInUse,
+               location.authorization != .authorizedAlways {
+                // The reading is national, which is much less useful than a
+                // local one. Explain what location is for before iOS asks, and
+                // always leave the manual route open.
+                LocationPermissionCard(onChooseManually: { router.show(.map) })
+            } else if focusArea == nil {
+                // Allowed, but no fix yet or the reader is outside Bangladesh.
+                // The picker is the only route left.
                 Button {
                     router.show(.map)
                 } label: {
@@ -209,38 +260,230 @@ struct DashboardView: View {
         }
     }
 
+    /// Statements about what moved since the last report.
+    ///
+    /// The section disappears entirely when the digest has nothing it can
+    /// support — an empty card saying "no changes" would be a claim of its own.
+    @ViewBuilder
+    private var whatChangedSection: some View {
+        let items = SurveillanceDigest.items(
+            nationalChange: store.weeklyCaseChange,
+            hotspotCount: store.hotspots.count,
+            hasAreaBreakdown: !store.areas.isEmpty,
+            risingAreas: store.areasByRisk.compactMap { area in
+                guard let change = area.weeklyChange, change > 0 else { return nil }
+                return (name: area.displayName(loc.language), change: change)
+            }
+            .sorted { $0.change > $1.change },
+            formatNumber: { loc.num($0) }
+        )
+
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: Space.row) {
+                SectionHeader(loc.t("digest.title"), subtitle: loc.t("digest.subtitle"))
+                Card {
+                    VStack(alignment: .leading, spacing: Space.tight) {
+                        ForEach(items) { item in
+                            HStack(alignment: .firstTextBaseline, spacing: Space.tight) {
+                                Image(systemName: symbol(for: item.kind))
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(tint(for: item.kind))
+                                    .frame(width: 18)
+                                    .accessibilityHidden(true)
+                                Text(loc.t(item.key, arguments: item.arguments))
+                                    .typo(.callout)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        SecondaryActionButton(title: loc.t("digest.action"),
+                                              systemImage: "map") { router.show(.map) }
+                            .padding(.top, Space.hair)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Icon and colour carry the same meaning as the words, so the section still
+    /// reads without colour vision and without reading every sentence.
+    private func symbol(for kind: SurveillanceDigest.Kind) -> String {
+        switch kind {
+        case .nationalRise, .steepestRises: "arrow.up.right"
+        case .nationalFall: "arrow.down.right"
+        case .nationalSteady: "equal"
+        case .hotspots: "exclamationmark.triangle.fill"
+        case .noBreakdown: "questionmark.circle"
+        }
+    }
+
+    private func tint(for kind: SurveillanceDigest.Kind) -> Color {
+        switch kind {
+        case .nationalRise, .steepestRises: Palette.riskTint(.high)
+        case .nationalFall: Palette.riskTint(.low)
+        case .hotspots: Palette.riskTint(.severe)
+        case .nationalSteady, .noBreakdown: Color.secondary
+        }
+    }
+
+    /// The areas carrying the most dengue per head, ranked.
+    ///
+    /// Ordered by `areasByRisk`, which sorts on the 14-day rate rather than raw
+    /// case counts. Ranking by counts would put the biggest cities on top every
+    /// week regardless of how bad things actually are there — which is the
+    /// question this list exists to answer.
+    @ViewBuilder
+    private var topAreasSection: some View {
+        let ranked = Array(store.areasByRisk.prefix(5))
+        if !ranked.isEmpty {
+            VStack(alignment: .leading, spacing: Space.row) {
+                SectionHeader(loc.t("top.title"), subtitle: loc.t("top.subtitle"))
+                Card {
+                    VStack(spacing: 0) {
+                        ForEach(Array(ranked.enumerated()), id: \.element.id) { index, area in
+                            NavigationLink(value: area) {
+                                topAreaRow(rank: index + 1, area: area)
+                            }
+                            .buttonStyle(.plain)
+                            if area.id != ranked.last?.id {
+                                Divider().padding(.leading, 44)
+                            }
+                        }
+                        SecondaryActionButton(title: loc.t("top.viewMap"),
+                                              systemImage: "map") { router.show(.map) }
+                            .padding(.top, Space.tight)
+                    }
+                }
+            }
+        }
+    }
+
+    private func topAreaRow(rank: Int, area: Area) -> some View {
+        HStack(spacing: Space.row) {
+            Text(loc.num(rank))
+                .typo(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 24, alignment: .trailing)
+
+            // Two full-width lines rather than one row of five competing
+            // items. The badge shares the name's line because their widths
+            // vary together — a long name is not also a long badge — and the
+            // rate then has the whole row, so nothing is ever cut short.
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: Space.tight) {
+                    Text(area.displayName(loc.language))
+                        .typo(.subheadline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: Space.tight)
+                    RiskBadge(risk: area.risk, compact: true)
+                }
+                HStack(spacing: Space.tight) {
+                    // A fixed gutter, so the change starts at the same place on
+                    // every row. Sized to its text, the rate carried the trend
+                    // along with it — "8.1 per 100,000" is a character shorter
+                    // than "41.3 per 100,000", so Dhaka (outside city) printed
+                    // its change 8pt left of the four rows above and the column
+                    // read as crooked. Measured on an iPhone 15 Pro Max: the
+                    // widest form is 116pt, so this clears it. Monospaced on
+                    // top, so rates of the same length do not shuffle either.
+                    Text(loc.t("top.rate", loc.decimal(area.incidencePer100k)))
+                        .typo(.micro)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.9)
+                        .frame(width: rateWidth, alignment: .leading)
+                    TrendIndicator(change: area.weeklyChange)
+                    Spacer(minLength: 0)
+                }
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .frame(minHeight: Hit.minimum)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Maps a triage outcome onto the risk palette, so the colour here means
+    /// the same thing it means everywhere else in the app.
+    /// The brief's "Today in Bangladesh": the national snapshot, led by the
+    /// freshest figure DGHS publishes rather than by the season total.
+    ///
+    /// Every tile here can be absent. A tile with nothing behind it is left
+    /// out rather than shown as zero — see `NationalSnapshot` for why that
+    /// distinction is not pedantry.
     private var activitySection: some View {
-        VStack(alignment: .leading, spacing: Space.row) {
-            SectionHeader(loc.t("activity.title"), subtitle: loc.t("activity.subtitle")) {
+        let snapshot = store.snapshot
+        return VStack(alignment: .leading, spacing: Space.row) {
+            SectionHeader(activityTitle, subtitle: activitySubtitle) {
                 SourceBadge(kind: .official, detail: "DGHS")
             }
 
-            LazyVGrid(columns: statColumns, spacing: Space.row) {
-                StatCard(label: loc.t("dash.stat.cases"),
-                         value: loc.num(store.seasonCases),
-                         caption: store.national.first.map { loc.t("activity.since", loc.dayMonth($0.date)) },
-                         accent: Palette.cases,
-                         series: store.nationalRecent(30).map { Double($0.cases) })
-                StatCard(label: loc.t("activity.thisWeek"),
-                         value: loc.num(store.last7Cases),
-                         change: store.weeklyCaseChange,
-                         caption: loc.t("dash.stat.vsLastWeek"),
-                         accent: Palette.cases,
-                         series: store.nationalRecent(14).map { Double($0.cases) })
-                // Replaces the old hospital-census card. This feed carries no
-                // bed occupancy, and the 24-hour count is what DGHS leads its
-                // daily release with anyway — the freshest figure on the screen.
-                StatCard(label: loc.t("dash.stat.last24"),
-                         value: loc.num(store.cases24h),
-                         caption: loc.t("dash.stat.last24Deaths", loc.num(store.deaths24h)),
-                         accent: Palette.admitted,
-                         series: store.nationalRecent(14).map { Double($0.cases) })
-                StatCard(label: loc.t("activity.hotspots"),
-                         value: loc.num(store.hotspots.count),
-                         caption: loc.t("activity.hotspotsCaption"),
-                         accent: Palette.deaths)
+            LazyVGrid(columns: statColumns(for: snapshot.tileCount), spacing: Space.row) {
+                if let cases24 = snapshot.last24Cases {
+                    StatCard(label: loc.t("dash.stat.last24"),
+                             value: loc.num(cases24),
+                             // Omitted rather than "0 deaths" when the figure
+                             // never arrived: that reads as good news.
+                             caption: snapshot.last24Deaths.map {
+                                 loc.t("dash.stat.last24Deaths", loc.num($0))
+                             },
+                             accent: Palette.admitted,
+                             series: store.nationalRecent(14).map { Double($0.cases) })
+                }
+                if let week = snapshot.weekCases {
+                    StatCard(label: loc.t("activity.thisWeek"),
+                             value: loc.num(week),
+                             change: snapshot.weeklyChange,
+                             caption: snapshot.weeklyChange == nil ? nil : loc.t("dash.stat.vsLastWeek"),
+                             accent: Palette.cases,
+                             series: store.nationalRecent(14).map { Double($0.cases) })
+                }
+                if let season = snapshot.seasonCases {
+                    StatCard(label: loc.t("dash.stat.cases"),
+                             value: loc.num(season),
+                             caption: snapshot.seasonStart.map { loc.t("activity.since", loc.dayMonth($0)) },
+                             accent: Palette.cases,
+                             series: store.nationalRecent(30).map { Double($0.cases) })
+                }
+                if let deaths = snapshot.seasonDeaths {
+                    // Beside the season case count, which is the figure it
+                    // belongs next to.
+                    StatCard(label: loc.t("dash.stat.seasonDeaths"),
+                             value: loc.num(deaths),
+                             caption: snapshot.seasonStart.map { loc.t("activity.since", loc.dayMonth($0)) },
+                             accent: Palette.deaths,
+                             // The seven-day average, as DeathsCard plots it.
+                             // Raw daily deaths are single digits and would be
+                             // noise at this size, not a trend.
+                             series: Array(Series.movingAverage(store.national.map(\.deaths),
+                                                                window: 7).suffix(30)))
+                }
+                if let hotspots = snapshot.highRiskAreas {
+                    StatCard(label: loc.t("activity.hotspots"),
+                             value: loc.num(hotspots),
+                             // The feed's reporting areas, not the country's 64
+                             // districts. The app has no district breakdown, so
+                             // it cannot use a district denominator.
+                             caption: loc.t("activity.hotspotsCaption", loc.num(snapshot.reportingAreas)),
+                             accent: Palette.deaths)
+                }
             }
         }
+    }
+
+    /// "Today" only when the figures are actually from today. Ten-day-old
+    /// numbers under a "Today" heading would be the app misreporting DGHS.
+    private var activityTitle: String {
+        store.isStale ? loc.t("activity.title.stale") : loc.t("activity.title")
+    }
+
+    private var activitySubtitle: String? {
+        store.lastUpdated.map { loc.t("activity.reported", loc.reportedDate($0)) }
     }
 
     private var trendSection: some View {
@@ -281,11 +524,11 @@ struct DashboardView: View {
     /// One column once text is large enough that two would crush the figures;
     /// four across on a regular-width screen, where two leaves each card mostly
     /// empty.
-    private var statColumns: [GridItem] {
+    private func statColumns(for tiles: Int) -> [GridItem] {
         if typeSize.isAccessibilitySize {
             return [GridItem(.flexible(), spacing: Space.row)]
         }
-        let count = sizeClass == .regular ? 4 : 2
+        let count = StatGrid.columns(forTiles: tiles, wide: sizeClass == .regular)
         return Array(repeating: GridItem(.flexible(), spacing: Space.row), count: count)
     }
 

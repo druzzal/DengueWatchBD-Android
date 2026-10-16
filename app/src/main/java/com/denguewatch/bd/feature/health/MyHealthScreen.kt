@@ -52,6 +52,20 @@ import com.denguewatch.bd.feature.shared.HealthTrendChart
 import com.denguewatch.bd.feature.shared.TrendThreshold
 import com.denguewatch.bd.model.HealthTrend
 import com.denguewatch.bd.model.minimumMeaningfulChange
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import com.denguewatch.bd.feature.triage.ConfirmCheckDeletion
+import com.denguewatch.bd.feature.triage.deleteLatest
+import com.denguewatch.bd.ui.theme.Hit
+import com.denguewatch.bd.ui.theme.Shapes
 
 /**
  * What the reader has recorded about their own illness, in one place.
@@ -68,6 +82,8 @@ import com.denguewatch.bd.model.minimumMeaningfulChange
 fun MyHealthScreen(
     state: AppState,
     onOpenCheck: () -> Unit,
+    onOpenCheckHistory: () -> Unit,
+    onAddDrink: () -> Unit,
     onOpenLog: () -> Unit,
     onRecordVitals: () -> Unit,
     onAddLabReport: () -> Unit,
@@ -77,6 +93,8 @@ fun MyHealthScreen(
     val loc = LocalLocalization.current
     val colors = Dw.colors
     val entries = state.caseLog.entries
+    // The latest check, once the reader has asked to delete it.
+    var confirmingDelete by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize().background(colors.plane),
@@ -90,11 +108,20 @@ fun MyHealthScreen(
                 title = loc.t("check.title"),
                 subtitle = loc.t("health.check.subtitle"),
                 modifier = Modifier.padding(horizontal = Space.screen),
+                accessory = {
+                    if (entries.isNotEmpty()) {
+                        CheckMenu(
+                            onOpenHistory = onOpenCheckHistory,
+                            onDeleteLatest = { confirmingDelete = true },
+                        )
+                    }
+                },
             ) {
                 val latest = entries.firstOrNull()
                 if (latest != null) {
-                    val outcome = TriageOutcome.entries
-                        .getOrElse(latest.outcomeOrdinal) { TriageOutcome.SELF_CARE }
+                    // Worked out from the check's answers by today's rules, so
+                    // it always agrees with the care plan below it.
+                    val outcome = latest.outcome
                     val summary = loc.t(outcome.headlineKey) + ", " +
                         loc.t("health.checkedAt", loc.relative(latest.dateMillis))
                     Row(
@@ -182,8 +209,21 @@ fun MyHealthScreen(
                     notableLabs = notableLabNames(state, loc),
                     onRecheck = onOpenCheck,
                     modifier = Modifier.padding(horizontal = Space.screen),
+                    haematocritRising = CarePlanContext.haematocritIsRising(
+                        state.labs.series(LabMeasure.HAEMATOCRIT),
+                    ),
                 )
             }
+        }
+
+        // WHO's oral fluids: what the reader drinks and how often they pass
+        // urine, today.
+        item {
+            FluidCard(
+                state = state,
+                onAddDrink = onAddDrink,
+                modifier = Modifier.padding(horizontal = Space.screen),
+            )
         }
 
         item {
@@ -296,12 +336,9 @@ fun MyHealthScreen(
                             Text(
                                 loc.decimal(value, measure.decimals),
                                 style = typo(Typo.CALLOUT).tabularFigures(),
-                                // Coloured only when outside the typical range,
-                                // for the same reason as the vitals tiles: a
-                                // normal count in red reads as an emergency.
-                                color = measure.status(value)
-                                    .takeIf { it != MeasureStatus.NORMAL }
-                                    ?.let { colors.riskInk(it.risk) } ?: colors.primaryText,
+                                // On the risk palette, green in the typical
+                                // range; the flag word beside it says the same.
+                                color = colors.riskInk(measure.status(value).risk),
                             )
                             ShrinkToFitText(
                                 loc.t(measure.unitKey),
@@ -397,10 +434,69 @@ fun MyHealthScreen(
 
         item { Spacer(Modifier.height(Space.section)) }
     }
+
+    if (confirmingDelete) {
+        ConfirmCheckDeletion(
+            loc = loc,
+            onConfirm = {
+                state.caseLog.deleteLatest()
+                confirmingDelete = false
+            },
+            onDismiss = { confirmingDelete = false },
+        )
+    }
+}
+
+/**
+ * Past checks, and deleting the latest one. In a menu rather than on the card:
+ * these are occasional, and a delete button beside "Check again" would sit one
+ * slip away from the action people come here for.
+ */
+@Composable
+private fun CheckMenu(onOpenHistory: () -> Unit, onDeleteLatest: () -> Unit) {
+    val loc = LocalLocalization.current
+    val colors = Dw.colors
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Icon(
+            DwIcons.more,
+            contentDescription = loc.t("check.actions"),
+            tint = colors.accent,
+            modifier = Modifier
+                .size(Hit.minimum)
+                .clip(Shapes.chip)
+                .clickable(role = Role.Button) { open = true }
+                .padding(12.dp),
+        )
+        DropdownMenu(open, onDismissRequest = { open = false }, containerColor = colors.card) {
+            DropdownMenuItem(
+                text = { Text(loc.t("check.history.title"), style = typo(Typo.SUBHEADLINE)) },
+                leadingIcon = {
+                    Icon(DwIcons.history, contentDescription = null, tint = colors.accent,
+                         modifier = Modifier.size(18.dp))
+                },
+                onClick = {
+                    open = false
+                    onOpenHistory()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(loc.t("check.delete"), style = typo(Typo.SUBHEADLINE)) },
+                leadingIcon = {
+                    Icon(DwIcons.delete, contentDescription = null,
+                         tint = colors.riskTint(RiskLevel.SEVERE), modifier = Modifier.size(18.dp))
+                },
+                onClick = {
+                    open = false
+                    onDeleteLatest()
+                },
+            )
+        }
+    }
 }
 
 /** The glyph and band iOS pairs with each outcome, so the card reads the same. */
-private val TriageOutcome.icon
+internal val TriageOutcome.icon
     get() = when (this) {
         TriageOutcome.SELF_CARE -> DwIcons.riskLow
         TriageOutcome.TEST_ADVISED -> DwIcons.riskModerate
@@ -408,7 +504,7 @@ private val TriageOutcome.icon
         TriageOutcome.EMERGENCY -> DwIcons.riskSevere
     }
 
-private val TriageOutcome.risk
+internal val TriageOutcome.risk
     get() = when (this) {
         TriageOutcome.SELF_CARE -> RiskLevel.LOW
         TriageOutcome.TEST_ADVISED -> RiskLevel.MODERATE
@@ -443,14 +539,22 @@ private fun VitalTile(state: AppState, kind: VitalKind, modifier: Modifier = Mod
             Text(
                 shown,
                 style = typo(Typo.STAT_VALUE).tabularFigures(),
-                // Only a reading that needs attention is coloured; a normal one
-                // in red would make every record look like an emergency.
-                color = status?.takeIf { it != MeasureStatus.NORMAL }
-                    ?.let { colors.riskInk(it.risk) } ?: colors.primaryText,
+                // Green in the usual range, amber to red outside it — the risk
+                // palette, as on iOS.
+                color = status?.let { colors.riskInk(it.risk) } ?: colors.primaryText,
             )
             if (stored != null) {
                 Text(unitLabel, style = typo(Typo.MICRO), color = colors.secondaryText)
             }
+        }
+        if (status != null) {
+            // The word beside the colour, so green and red are never the only
+            // thing telling a normal reading from one that is not.
+            Text(
+                loc.t(status.labelKey),
+                style = typo(Typo.MICRO),
+                color = colors.riskInk(status.risk),
+            )
         }
     }
 }

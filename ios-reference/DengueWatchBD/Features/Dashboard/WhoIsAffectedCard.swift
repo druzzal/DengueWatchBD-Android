@@ -13,6 +13,16 @@ import SwiftUI
 struct WhoIsAffectedCard: View {
     @Environment(LocalizationManager.self) private var loc
 
+    /// Wide enough for the longest count either language writes.
+    ///
+    /// English abbreviates to "10.1k"; Bengali spells the scale out as
+    /// "১০ হাজার", which is half as wide again and wrapped onto a second line
+    /// in a column sized for the English. Fixed rather than fitted, so the
+    /// bars all start and end in the same place, and scaled so it still holds
+    /// at larger type.
+    @ScaledMetric(relativeTo: .caption) private var countWidth: CGFloat = 78
+    @ScaledMetric(relativeTo: .caption) private var bandWidth: CGFloat = 46
+
     let bands: [AgeBand]
     let split: SexSplit?
 
@@ -34,10 +44,15 @@ struct WhoIsAffectedCard: View {
                 .padding(.bottom, 2)
             }
 
+            // The third entry appears only when the source actually carries
+            // cases of unrecorded sex, so a clean table is not given a legend
+            // key for something it does not contain.
             ChartLegend(items: [
                 .init(label: loc.t("who.male"), color: Palette.cases),
                 .init(label: loc.t("who.female"), color: Palette.deaths)
-            ])
+            ] + (bands.contains { $0.unrecordedSex > 0 }
+                 ? [.init(label: loc.t("who.unrecorded"), color: Palette.mutedInk)]
+                 : []))
 
             VStack(spacing: 5) {
                 ForEach(bands) { band in
@@ -49,11 +64,11 @@ struct WhoIsAffectedCard: View {
 
     private func row(_ band: AgeBand) -> some View {
         HStack(spacing: Space.tight) {
-            Text(band.label)
+            Text(band.label(loc.style))
                 .typo(.micro)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .leading)
+                .frame(width: bandWidth, alignment: .leading)
 
             GeometryReader { geometry in
                 let unit = geometry.size.width / CGFloat(peak)
@@ -62,6 +77,14 @@ struct WhoIsAffectedCard: View {
                         .frame(width: max(1, CGFloat(band.male) * unit))
                     Capsule().fill(Palette.deaths)
                         .frame(width: max(1, CGFloat(band.female) * unit))
+                    // Cases DGHS counted but recorded no sex for. Drawn in
+                    // neutral ink so the bar adds up to the number printed
+                    // beside it — without this the row claimed a total it did
+                    // not draw.
+                    if band.unrecordedSex > 0 {
+                        Capsule().fill(Palette.mutedInk)
+                            .frame(width: max(1, CGFloat(band.unrecordedSex) * unit))
+                    }
                     Spacer(minLength: 0)
                 }
                 .frame(height: geometry.size.height, alignment: .center)
@@ -71,11 +94,18 @@ struct WhoIsAffectedCard: View {
             Text(loc.compact(band.total))
                 .typo(.micro)
                 .monospacedDigit()
-                .frame(width: 46, alignment: .trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: countWidth, alignment: .trailing)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(loc.t("who.a11y", band.label,
-                                  loc.num(band.male), loc.num(band.female)))
+        // The third segment is drawn, so it is spoken: a reader hearing only
+        // the two sexes would be told a smaller number than the bar shows.
+        .accessibilityLabel(loc.t("who.a11y", band.label(loc.style),
+                                  loc.num(band.male), loc.num(band.female))
+                            + (band.unrecordedSex > 0
+                               ? " " + loc.t("who.a11y.unrecorded", loc.num(band.unrecordedSex))
+                               : ""))
     }
 
     private func sexShare(label: String, value: Int, share: Double, color: Color) -> some View {

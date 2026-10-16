@@ -30,6 +30,11 @@ data class MythFact(val id: String) {
             MythFact("platelets"),
             // The one that turns a survivable illness into a bleed.
             MythFact("painkillers"),
+            // Families push for platelets at a number; WHO 2025 advises against
+            // transfusing a low count without bleeding.
+            MythFact("transfusion"),
+            // WHO 2025 advises against steroids in dengue, mild or severe.
+            MythFact("steroids"),
         )
     }
 }

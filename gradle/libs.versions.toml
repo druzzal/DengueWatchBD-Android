@@ -14,6 +14,8 @@ work = "2.11.2"
 mlkit-text = "16.0.1"
 junit = "4.13.2"
 org-json = "20260814"
+androidx-test-ext = "1.3.0"
+androidx-test-runner = "1.7.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -51,6 +53,14 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 # Android's android.jar ships org.json as method stubs that throw; unit tests
 # need a real implementation on the classpath to exercise the feed parser.
 org-json = { group = "org.json", name = "json", version.ref = "org-json" }
+
+# UI tests: Compose's test rule, driven by the AndroidX runner on an emulator
+# or a phone. The manifest artefact supplies the empty activity the rule hosts
+# content in, and ships only in debug builds.
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test-runner" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

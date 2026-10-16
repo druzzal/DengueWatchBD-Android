@@ -4,16 +4,22 @@ extension Strings {
     static let enCommon: [String: String] = [
         "common.unknown": "unknown",
         "common.done": "Done",
+        // Spoken by VoiceOver on a section header that opens and closes, so the
+        // reader knows whether tapping will reveal or hide what is under it.
+        "common.expanded": "Expanded",
+        "common.collapsed": "Collapsed",
         "common.cancel": "Cancel",
+        "common.save": "Save",
+        "common.delete": "Delete",
+        "common.today": "Today",
+        "common.yesterday": "Yesterday",
         "common.ok": "OK",
         "common.tryAgain": "Try again",
-        "common.saved": "Saved",
         "common.deleteAll": "Delete all",
         "common.per100k": "per 100k",
 
-        "tab.overview": "Overview",
         "tab.map": "Map",
-        "tab.check": "Check",
+        "tab.health": "My health",
         "tab.care": "Care",
         "tab.prevent": "Prevent",
 
@@ -38,16 +44,20 @@ extension Strings {
     static let bnCommon: [String: String] = [
         "common.unknown": "অজানা",
         "common.done": "সম্পন্ন",
+        "common.expanded": "খোলা",
+        "common.collapsed": "বন্ধ",
         "common.cancel": "বাতিল",
+        "common.save": "সংরক্ষণ",
+        "common.delete": "মুছুন",
+        "common.today": "আজ",
+        "common.yesterday": "গতকাল",
         "common.ok": "ঠিক আছে",
         "common.tryAgain": "আবার চেষ্টা করুন",
-        "common.saved": "সংরক্ষিত",
         "common.deleteAll": "সব মুছে ফেলুন",
         "common.per100k": "প্রতি লাখে",
 
-        "tab.overview": "সারসংক্ষেপ",
         "tab.map": "মানচিত্র",
-        "tab.check": "পরীক্ষা",
+        "tab.health": "আমার স্বাস্থ্য",
         "tab.care": "চিকিৎসা",
         "tab.prevent": "প্রতিরোধ",
 

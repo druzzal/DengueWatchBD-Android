@@ -14,6 +14,9 @@ import com.denguewatch.bd.data.BackgroundRefresh
 import com.denguewatch.bd.data.BundledFeedService
 import com.denguewatch.bd.data.CaseLogStore
 import com.denguewatch.bd.data.LabStore
+import com.denguewatch.bd.data.FluidStore
+import com.denguewatch.bd.model.HealthLog
+import com.denguewatch.bd.model.HealthLogDay
 import com.denguewatch.bd.data.VitalsStore
 import com.denguewatch.bd.data.DengueStore
 import com.denguewatch.bd.data.FeedSync
@@ -51,6 +54,13 @@ class AppState(context: Context) : ViewModel() {
     /** Readings the user takes themselves, and what a lab reported back. */
     val vitals = VitalsStore(context)
     val labs = LabStore(context)
+
+    /** What the reader drank and how often they passed urine — WHO's oral fluids. */
+    val fluids = FluidStore(context)
+
+    /** The whole health record by day, newest first: every screen reads it from here. */
+    val healthLogDays: List<HealthLogDay>
+        get() = HealthLog.days(vitals.entries, labs.reports, fluids.entries)
 
     /** Today's prevention tasks, cleared whenever the day turns over. */
     val checklist = PreventionChecklistStore(context)

@@ -10,7 +10,49 @@ struct CaseLogEntry: Identifiable, Codable, Hashable {
     var areaCode: String?
     var note: String = ""
 
-    var outcome: TriageOutcome { TriageOutcome(rawValue: outcomeRawValue) ?? .selfCare }
+    /// Days since the fever began, zero-based, as the checker records it.
+    /// Nil when there was no fever to date from.
+    ///
+    /// Persisted so the fever timeline and the WHO plan survive the check that
+    /// produced them — without it, the day of illness is known for one screen
+    /// and then forgotten, which is the one number dengue care turns on.
+    /// Optional, so entries written before this existed still decode.
+    var feverDaysAgo: Int?
+
+    /// The co-existing conditions WHO singles out, as ticked at the time.
+    /// They decide the WHO management group, so the plan cannot be rebuilt
+    /// without them.
+    var isPregnant = false
+    var isUnderFiveOrOverSixty = false
+    var hasChronicCondition = false
+    var hadDengueBefore = false
+
+    var triageContext: TriageEngine.Context {
+        TriageEngine.Context(feverDaysAgo: feverDaysAgo,
+                             isPregnant: isPregnant,
+                             isUnderFiveOrOverSixty: isUnderFiveOrOverSixty,
+                             hasChronicCondition: hasChronicCondition,
+                             hadDengueBefore: hadDengueBefore)
+    }
+
+    /// The day the fever began, for the timeline.
+    var feverStarted: Date? {
+        feverDaysAgo.flatMap {
+            Calendar.current.date(byAdding: .day, value: -$0,
+                                  to: Calendar.current.startOfDay(for: date))
+        }
+    }
+
+    /// What the check advises, worked out from its answers by today's rules.
+    ///
+    /// Not the outcome stored when the check was made: when the rules change —
+    /// as they did for WHO's 2025 guideline — a stored outcome would go on
+    /// showing the old advice on the card, beside a care plan that is always
+    /// worked out afresh, and the two would disagree. `outcomeRawValue` is still
+    /// written, as a record of what was shown at the time.
+    var outcome: TriageOutcome {
+        TriageEngine.evaluate(selected: Set(symptomIDs), context: triageContext)
+    }
 }
 
 /// The user's own check-ins, kept on device in Application Support.
@@ -32,6 +74,11 @@ final class CaseLogStore {
 
     func add(_ entry: CaseLogEntry) {
         entries.insert(entry, at: 0)
+        // Sorted, like the other two stores and like load(). A check always
+        // arrives dated now, so this changes nothing today — but load() sorts,
+        // and a store whose two halves disagree about its own order is a store
+        // waiting to be wrong.
+        entries.sort { $0.date > $1.date }
         save()
     }
 
@@ -40,15 +87,33 @@ final class CaseLogStore {
         save()
     }
 
+    /// Delete one entry by identity. The combined log groups both stores by
+    /// day, so a row's position there says nothing about its index here.
+    func delete(id: UUID) {
+        entries.removeAll { $0.id == id }
+        save()
+    }
+
+
     func clear() {
         entries.removeAll()
         save()
     }
 
 
+    /// Newest first, like the other two stores.
+    ///
+    /// Sorted here rather than trusted from the file. `entries.first` is "the
+    /// latest check", and it decides the care plan, the day of illness the
+    /// fever timeline counts from, and what My Health and Home report as the
+    /// last assessment. A file whose order does not match its dates — written
+    /// by an older build, or restored from anywhere — would make every one of
+    /// those describe a check the reader has since replaced.
     private func load() {
-        guard let data = try? Data(contentsOf: fileURL) else { return }
-        entries = (try? JSONDecoder().decode([CaseLogEntry].self, from: data)) ?? []
+        guard let data = try? Data(contentsOf: fileURL),
+              let decoded = try? JSONDecoder().decode([CaseLogEntry].self, from: data)
+        else { return }
+        entries = decoded.sorted { $0.date > $1.date }
     }
 
     private func save() {

@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.denguewatch.bd.feature.triage.TriageEngine
+import com.denguewatch.bd.feature.triage.TriageOutcome
 import com.denguewatch.bd.model.mapObjects
 import com.denguewatch.bd.model.mapStrings
 import com.denguewatch.bd.model.optStringOrNull
@@ -42,6 +43,18 @@ data class CaseLogEntry(
     val hasChronicCondition: Boolean = false,
     val hadDengueBefore: Boolean = false,
 ) {
+    /**
+     * What the check advises, worked out from its answers by today's rules.
+     *
+     * Not the outcome stored when the check was made: when the rules change —
+     * as they did for WHO's 2025 guideline — a stored outcome would go on
+     * showing the old advice on the card, beside a care plan that is always
+     * worked out afresh, and the two would disagree. [outcomeOrdinal] is still
+     * written, as a record of what was shown at the time.
+     */
+    val outcome: TriageOutcome
+        get() = TriageEngine.evaluate(symptomIds.toSet(), triageContext)
+
     val triageContext: TriageEngine.Context
         get() = TriageEngine.Context(
             feverDaysAgo = feverDaysAgo,
@@ -120,8 +133,13 @@ class CaseLogStore(context: Context, filename: String = "case-log.json") {
         load()
     }
 
+    /**
+     * Newest first, sorted rather than trusted: the latest check drives the
+     * care plan, so the first entry must be the newest one whatever order the
+     * file or the caller gave.
+     */
     fun add(entry: CaseLogEntry) {
-        entries = listOf(entry) + entries
+        entries = (listOf(entry) + entries).sortedByDescending { it.dateMillis }
         save()
     }
 
@@ -139,6 +157,7 @@ class CaseLogStore(context: Context, filename: String = "case-log.json") {
         if (!file.exists()) return
         entries = runCatching {
             JSONArray(file.readText()).mapObjects { CaseLogEntry.from(it) }
+                .sortedByDescending { it.dateMillis }
         }.getOrDefault(emptyList())
     }
 
