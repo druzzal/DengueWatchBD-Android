@@ -173,7 +173,6 @@ class AppState(context: Context) : ViewModel() {
 
     override fun onCleared() {
         sync.stop()
-        super.onCleared()
     }
 
     /**

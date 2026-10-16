@@ -43,6 +43,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -94,42 +95,6 @@ import com.denguewatch.bd.ui.theme.typo
 import com.denguewatch.bd.ui.theme.windowSizeDp
 import com.denguewatch.bd.ui.theme.ShortHeightBreakpoint
 import kotlinx.coroutines.launch
-
-/**
- * Which screen is in front.
- *
- * A sealed hierarchy rather than a navigation graph with string routes: there
- * are five tabs and four pushed screens, every one of which carries a typed
- * argument or none at all, and a route table would turn those arguments back
- * into strings for no gain.
- */
-sealed interface Destination {
-    /**
-     * Where Back leads. Every screen is opened from the tabs except a log day,
-     * which is opened from the log and goes back there — sending it to the
-     * tabs skipped the list the reader had just picked it from — and the area
-     * picker, which belongs to the alerts screen.
-     */
-    val parent: Destination get() = Tabs
-
-    data object Tabs : Destination
-    data class AreaDetail(val areaCode: String) : Destination
-    data object SymptomCheck : Destination
-    data object RecordVitals : Destination
-    data object AddLabReport : Destination
-    data object AddFluid : Destination
-    data object CheckHistory : Destination
-    data object CaseLog : Destination
-    data class LogDay(val dayMillis: Long) : Destination {
-        override val parent: Destination get() = CaseLog
-    }
-    data object TriageResult : Destination
-    data object About : Destination
-    data object AlertSettings : Destination
-    data object AreaPicker : Destination {
-        override val parent: Destination get() = AlertSettings
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -201,21 +166,30 @@ private fun MainScaffold(
     val scope = rememberCoroutineScope()
 
 
-    var destination by remember { mutableStateOf<Destination>(Destination.Tabs) }
+    // Saveable, like the check's answers below: Android may stop the app in
+    // the background — to make room for the camera while a lab report is
+    // photographed, say — and the reader should come back to the same screen.
+    var destination by rememberSaveable(stateSaver = DestinationSaver) {
+        mutableStateOf<Destination>(Destination.Tabs)
+    }
     // Width now, not the shorter side: a phone turned sideways is wide enough
     // for the rail and short enough to need it.
     val wide = windowSizeDp().width >= Layout.regularWidthBreakpoint
     // Lets the two recording screens put their Save button in the bar, where
     // iOS has it, without the bar having to know what is in their fields.
     val saveSlot = remember { SaveSlot() }
-    var showsList by remember { mutableStateOf(false) }
+    var showsList by rememberSaveable { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
 
     // The check's own state lives here so the result screen can be a
     // destination rather than a nested navigation host.
-    var selectedSymptoms by remember { mutableStateOf(emptySet<String>()) }
-    var triageContext by remember { mutableStateOf(TriageEngine.Context()) }
-    var feverDaysAgo by remember { mutableStateOf<Int?>(null) }
+    var selectedSymptoms by rememberSaveable(stateSaver = SymptomSetSaver) {
+        mutableStateOf(emptySet<String>())
+    }
+    var triageContext by rememberSaveable(stateSaver = TriageContextSaver) {
+        mutableStateOf(TriageEngine.Context())
+    }
+    var feverDaysAgo by rememberSaveable { mutableStateOf<Int?>(null) }
 
     var riskSheet by remember { mutableStateOf<RiskSheetArgs?>(null) }
 
@@ -230,35 +204,7 @@ private fun MainScaffold(
         destination = destination.parent
     }
 
-    val title = when (val current = destination) {
-        is Destination.Tabs -> when (state.selectedTab) {
-            Tab.HOME -> loc.t("dash.title")
-            Tab.MAP -> loc.t("map.title")
-            Tab.HEALTH -> loc.t("tab.health")
-            Tab.CARE -> loc.t("care.title")
-            Tab.PREVENT -> loc.t("prevent.title")
-        }
-        is Destination.AreaDetail ->
-            state.store.area(current.areaCode)?.displayName(loc.language) ?: ""
-        Destination.SymptomCheck -> loc.t("check.title")
-        Destination.RecordVitals -> loc.t("vital.record")
-        Destination.AddLabReport -> loc.t("lab.add")
-        Destination.AddFluid -> loc.t("fluid.add.title")
-        Destination.CheckHistory -> loc.t("check.history.title")
-        Destination.CaseLog -> loc.t("log.title")
-        // The day's own name, so the reader knows which record they opened.
-        is Destination.LogDay -> {
-            val days = state.healthLogDays
-            val numbers = HealthLog.numbers(days)
-            state.logNames.name(current.dayMillis)
-                ?: numbers[current.dayMillis]?.let { loc.t("log.defaultName", loc.num(it)) }
-                ?: loc.dayMonth(current.dayMillis)
-        }
-        Destination.TriageResult -> loc.t("result.title")
-        Destination.About -> loc.t("about.title")
-        Destination.AlertSettings -> loc.t("alerts.title")
-        Destination.AreaPicker -> loc.t("area.picker.title")
-    }
+    val title = destination.title(state, loc)
 
     val showRail = wide && destination == Destination.Tabs
     // The rail runs the full height of the screen with the top bar beside it,
@@ -398,30 +344,7 @@ private fun MainScaffold(
             // Compact width only. From 600dp — a tablet, or a phone on its side,
             // where a bottom bar spends a fifth of the little height there is —
             // the tabs move to a rail at the side instead.
-            if (destination == Destination.Tabs && !wide) {
-                NavigationBar(containerColor = colors.card, tonalElevation = 0.dp) {
-                    Tab.entries.forEach { tab ->
-                        val isCurrent = state.selectedTab == tab
-                        NavigationBarItem(
-                            selected = isCurrent,
-                            onClick = { state.show(tab) },
-                            icon = { TabIcon(tab) },
-                            label = { TabLabel(tab, isCurrent) },
-                            // The current tab in accent, the rest in ink.
-                            // `primaryText` rather than a literal black so the
-                            // bar stays legible in dark mode, where that token
-                            // is near-white.
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = colors.accent,
-                                selectedTextColor = colors.accent,
-                                unselectedIconColor = colors.primaryText,
-                                unselectedTextColor = colors.primaryText,
-                                indicatorColor = colors.accent.copy(alpha = 0.12f),
-                            ),
-                        )
-                    }
-                }
-            }
+            if (destination == Destination.Tabs && !wide) TabBar(state)
         },
     ) { padding ->
         val content = PaddingValues(
@@ -696,89 +619,6 @@ Destination.SymptomCheck -> SymptomCheckerScreen(
             onDismiss = { riskSheet = null },
         )
     }
-}
-
-/** The tabs down the side, for a wide screen. Same items and colours as the bar. */
-@Composable
-private fun TabRail(state: AppState, modifier: Modifier = Modifier) {
-    val colors = Dw.colors
-    // On the page's own background rather than the bar's card colour, so it
-    // reads as part of the page rather than as a slab beside it.
-    // A phone on its side is wide enough for the rail but only ~300dp tall
-    // below the top bar, and five labelled items do not fit: the fifth was cut
-    // off. There, only the current tab keeps its label, as Material does for
-    // short rails.
-    val short = windowSizeDp().height < ShortHeightBreakpoint
-    NavigationRail(modifier = modifier, containerColor = colors.plane) {
-        // Centred in the height, so the five sit within reach of a thumb on a
-        // tablet held at the sides rather than bunched at the top — and able to
-        // scroll if a large font size still makes them taller than the screen,
-        // rather than losing the last one off the bottom.
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-        Column(
-            Modifier.verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-        Tab.entries.forEach { tab ->
-            val isCurrent = state.selectedTab == tab
-            NavigationRailItem(
-                selected = isCurrent,
-                onClick = { state.show(tab) },
-                icon = { TabIcon(tab) },
-                label = { TabLabel(tab, isCurrent) },
-                alwaysShowLabel = !short,
-                colors = NavigationRailItemDefaults.colors(
-                    selectedIconColor = colors.accent,
-                    selectedTextColor = colors.accent,
-                    unselectedIconColor = colors.primaryText,
-                    unselectedTextColor = colors.primaryText,
-                    indicatorColor = colors.accent.copy(alpha = 0.12f),
-                ),
-            )
-        }
-        }
-        }
-    }
-}
-
-@Composable
-private fun TabIcon(tab: Tab) {
-    Icon(
-        when (tab) {
-            Tab.HOME -> DwIcons.home
-            Tab.MAP -> DwIcons.map
-            Tab.HEALTH -> DwIcons.health
-            Tab.CARE -> DwIcons.care
-            Tab.PREVENT -> DwIcons.prevent
-        },
-        contentDescription = null,
-        modifier = Modifier.size(22.dp),
-    )
-}
-
-/**
- * A tab's name on one line, whatever the font size.
- *
- * A tab slot is a fifth of the screen and cannot grow. At a 2.0 font scale
- * "চিকিৎসা" wrapped onto a second line, pushing into the icon above it and
- * running off the edge on the last tab. Shrinking keeps every label on one line
- * and legible.
- *
- * The colour is passed rather than inherited. ShrinkToFitText resolves its own
- * ink and does not read the item colours, so when the label became one it
- * stopped following selection while the icon kept following it. Deriving both
- * from [isCurrent] keeps them in step.
- */
-@Composable
-private fun TabLabel(tab: Tab, isCurrent: Boolean) {
-    val colors = Dw.colors
-    ShrinkToFitText(
-        LocalLocalization.current.t(tab.titleKey),
-        style = typo(Typo.MICRO),
-        color = if (isCurrent) colors.accent else colors.primaryText,
-        minScale = 0.6f,
-    )
 }
 
 private data class RiskSheetArgs(

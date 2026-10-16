@@ -19,9 +19,10 @@ import java.io.File
  * screen that says "latest" means the newest reading rather than the one most
  * recently typed.
  */
-class VitalsStore(context: Context, filename: String = "vitals.json") {
+class VitalsStore(private val file: File) {
 
-    private val file = File(context.applicationContext.filesDir, filename)
+    constructor(context: Context, filename: String = "vitals.json") :
+        this(File(context.applicationContext.filesDir, filename))
 
     var entries: List<VitalsEntry> by mutableStateOf(emptyList())
         private set

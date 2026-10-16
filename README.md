@@ -49,6 +49,24 @@ health, and a touch aimed at a row half under it lands on the bar. The export
 test checks the finished PDF was written for the share sheet; the sheet itself
 is the system's. Gradle uninstalls the app after the run.
 
+#### Shared clinical cases
+
+`app/src/test/resources/clinical-rules.json` holds the cases both apps must
+agree on: triage outcomes, the WHO care-plan group and its reasons, reading
+ranges, what a typed number is read as, what a scanned report line is read
+as, trends, and the fluid log's waking hours. `ClinicalConformanceTest` runs
+every case here; the iOS app's `ClinicalConformanceTests` runs the same file.
+Change a clinical rule in one app, add or update its case, and copy the file
+byte for byte to the other repository
+(`DengueWatchBD/DengueWatchBDTests/clinical-rules.json`). When both
+repositories sit side by side in `~/Developer`, a test here fails if the two
+copies differ.
+
+The plumbing has its own tests: the stores read and write real files in a
+temporary folder, the alert and digest timing is tested as plain functions,
+and `BackgroundScheduleTest` (instrumented) checks that re-applying the
+periodic work on every launch leaves its schedule alone.
+
 ## Layout
 
 ```

@@ -1,5 +1,6 @@
 package com.denguewatch.bd.feature.triage
 
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -88,7 +89,7 @@ fun SymptomCheckerScreen(
     val loc = LocalLocalization.current
     val colors = Dw.colors
 
-    var step by remember { mutableStateOf(CheckerStep.FEVER) }
+    var step by rememberSaveable { mutableStateOf(CheckerStep.FEVER) }
     val steps = CheckerStep.sequence(hasFever = "fever" in selected)
     // The step can fall out of the sequence under the reader: answering "no
     // fever" while standing on the timeline step removes that step. Coercing

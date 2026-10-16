@@ -120,8 +120,8 @@ class WeeklyDigestWorker(
 
 object BackgroundRefresh {
 
-    private const val REFRESH_WORK = "dengue-refresh"
-    private const val DIGEST_WORK = "dengue-weekly-digest"
+    internal const val REFRESH_WORK = "dengue-refresh"
+    internal const val DIGEST_WORK = "dengue-weekly-digest"
     private const val REARM_WORK = "dengue-geofence-rearm"
 
     /**
@@ -193,9 +193,8 @@ object BackgroundRefresh {
         )
     }
 
-    private fun millisUntilNextSundayMorning(): Long {
-        val now = Calendar.getInstance()
-        val target = Calendar.getInstance().apply {
+    internal fun millisUntilNextSundayMorning(now: Calendar = Calendar.getInstance()): Long {
+        val target = (now.clone() as Calendar).apply {
             set(Calendar.HOUR_OF_DAY, 9)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)

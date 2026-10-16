@@ -122,9 +122,10 @@ data class CaseLogEntry(
  * directory. Nothing here leaves the phone — the privacy footer on the log
  * screen says so, and this is what makes that true.
  */
-class CaseLogStore(context: Context, filename: String = "case-log.json") {
+class CaseLogStore(private val file: File) {
 
-    private val file = File(context.applicationContext.filesDir, filename)
+    constructor(context: Context, filename: String = "case-log.json") :
+        this(File(context.applicationContext.filesDir, filename))
 
     var entries: List<CaseLogEntry> by mutableStateOf(emptyList())
         private set

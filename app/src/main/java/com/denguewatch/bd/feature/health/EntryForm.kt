@@ -1,5 +1,8 @@
 package com.denguewatch.bd.feature.health
 
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.saveable.Saver
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -426,3 +429,25 @@ internal fun withTimeOf(millis: Long, hour: Int, minute: Int): Long =
         set(Calendar.SECOND, 0)
         set(Calendar.MILLISECOND, 0)
     }.timeInMillis
+
+/**
+ * A form's fields keyed by an enum — the readings typed so far, the tests
+ * marked — saved as plain strings, so they survive Android stopping the app in
+ * the background. It does that to make room for the camera, which is exactly
+ * when a lab report is being photographed into this form.
+ */
+internal inline fun <reified K : Enum<K>, V : Any> enumKeyedMapSaver(
+    crossinline encode: (V) -> String,
+    crossinline decode: (String) -> V?,
+): Saver<SnapshotStateMap<K, V>, ArrayList<String>> = Saver(
+    save = { map -> ArrayList(map.flatMap { (key, value) -> listOf(key.name, encode(value)) }) },
+    restore = { flat ->
+        mutableStateMapOf<K, V>().apply {
+            flat.chunked(2).forEach { pair ->
+                if (pair.size != 2) return@forEach
+                val key = enumValues<K>().firstOrNull { it.name == pair[0] } ?: return@forEach
+                decode(pair[1])?.let { put(key, it) }
+            }
+        }
+    },
+)

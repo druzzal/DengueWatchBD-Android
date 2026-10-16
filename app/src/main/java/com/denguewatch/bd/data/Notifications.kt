@@ -101,6 +101,15 @@ object Notifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+    /**
+     * The once-a-day gate both alerts share: due unless one already went out
+     * on or after the start of today. A stored day later than today — a clock
+     * moved backwards — still counts as sent, so a wrong clock can delay an
+     * alert by a day but never repeat one.
+     */
+    internal fun isDueToday(lastAlertDayStart: Long, todayStart: Long): Boolean =
+        lastAlertDayStart < todayStart
+
     private fun startOfToday(): Long = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
         set(Calendar.MINUTE, 0)
@@ -129,7 +138,7 @@ object Notifications {
 
         val today = startOfToday()
         val store = prefs(context)
-        if (store.getLong(KEY_LAST_RISK_ALERT, 0L) >= today) return false
+        if (!isDueToday(store.getLong(KEY_LAST_RISK_ALERT, 0L), today)) return false
         store.edit().putLong(KEY_LAST_RISK_ALERT, today).apply()
 
         val loc = Localization(context)
@@ -172,7 +181,7 @@ object Notifications {
         val key = KEY_LAST_GEOFENCE_PREFIX + area.code
         val today = startOfToday()
         val store = prefs(context)
-        if (store.getLong(key, 0L) >= today) return false
+        if (!isDueToday(store.getLong(key, 0L), today)) return false
         store.edit().putLong(key, today).apply()
 
         val loc = Localization(context)

@@ -1,5 +1,6 @@
 package com.denguewatch.bd.feature.health
 
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -57,13 +58,17 @@ fun VitalsEntryScreen(
     val preferences = state.preferences
     val unit = preferences.temperatureUnit
 
-    val text = remember { mutableStateMapOf<VitalKind, String>() }
-    var note by remember { mutableStateOf("") }
+    // Saveable, so a half-entered set of readings survives Android stopping
+    // the app in the background.
+    val text = rememberSaveable(saver = enumKeyedMapSaver<VitalKind, String>({ it }, { it })) {
+        mutableStateMapOf()
+    }
+    var note by rememberSaveable { mutableStateOf("") }
     // Readings are often written up after the fact — a fever taken at three in
     // the morning and entered at nine. Stamping them "now" would put the spike
     // on the wrong day and in the wrong place on the chart, so the reader says
     // when.
-    var takenAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var takenAt by rememberSaveable { mutableLongStateOf(System.currentTimeMillis()) }
     // The figure a unit switch wrote into the temperature field, and the exact
     // Celsius behind it. Converting from the rounded figure instead drifted a
     // tenth on every switch: 101 °F, 38.3 °C, 100.9 °F.

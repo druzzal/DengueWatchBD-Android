@@ -1,5 +1,6 @@
 package com.denguewatch.bd.feature.health
 
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
@@ -83,14 +84,23 @@ fun LabEntryScreen(
     val loc = LocalLocalization.current
     val colors = Dw.colors
 
-    val text = remember { mutableStateMapOf<LabMeasure, String>() }
-    val results = remember { mutableStateMapOf<DengueTest, TestResult>() }
-    var note by remember { mutableStateOf("") }
+    // Saveable: photographing a report hands the screen to the camera, and
+    // Android may stop this app while it is away. Coming back to an empty form
+    // would lose every value already read off the page.
+    val text = rememberSaveable(saver = enumKeyedMapSaver<LabMeasure, String>({ it }, { it })) {
+        mutableStateMapOf()
+    }
+    val results = rememberSaveable(
+        saver = enumKeyedMapSaver<DengueTest, TestResult>({ it.name }, { name ->
+            TestResult.entries.firstOrNull { it.name == name }
+        }),
+    ) { mutableStateMapOf() }
+    var note by rememberSaveable { mutableStateOf("") }
     // Date and time both: two reports from one day are ordinary during dengue —
     // a morning count and an evening one — and a date alone leaves the log
     // unable to say which came first, which is the whole point of watching a
     // platelet count fall.
-    var reportDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var reportDate by rememberSaveable { mutableLongStateOf(System.currentTimeMillis()) }
 
     fun reading(measure: LabMeasure) = MeasureInput.read(text[measure].orEmpty(), measure)
 

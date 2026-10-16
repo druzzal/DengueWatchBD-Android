@@ -613,7 +613,7 @@ private fun notableLabNames(state: AppState, loc: Localization): String? {
     }
     val context = CarePlanContext.from(vitals = emptyList(), labs = readings)
     if (context.notableLabs.isEmpty()) return null
-    return context.notableLabs.joinToString(", ") { loc.t(it.labelKey) }
+    return loc.style.list(context.notableLabs.map { loc.t(it.labelKey) })
 }
 
 /**

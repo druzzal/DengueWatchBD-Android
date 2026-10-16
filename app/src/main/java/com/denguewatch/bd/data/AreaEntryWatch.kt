@@ -59,19 +59,7 @@ object AreaEntryWatch {
         // already in would read as a fresh entry.
         prefs(context).edit().putString(KEY_LAST_AREA, area.code).apply()
 
-        // The first check establishes where the reader is; it does not report an
-        // arrival. Without this, switching the warning on while sitting at home
-        // in a risky area fires immediately — "you are entering Dhaka North
-        // City" to someone who has been there all week. That is a false alarm,
-        // and it is the same one the geofence path avoids by not passing
-        // INITIAL_TRIGGER_ENTER.
-        if (previous == null) return null
-
-        // Staying put is not entering. Only a change of area counts, which is
-        // what makes this an entry warning rather than a daily nag about where
-        // the reader lives.
-        if (previous == area.code) return null
-        if (area.risk.ordinal < threshold.ordinal) return null
+        if (!isEntryWorthWarning(previous, area.code, area.risk, threshold)) return null
 
         val watched = WatchedArea.from(area)
         Notifications.createChannels(context)
@@ -79,6 +67,28 @@ object AreaEntryWatch {
         // geofences fired is not told the same thing twice.
         return if (Notifications.raiseGeofenceAlert(context, watched)) area else null
     }
+
+    /**
+     * Whether moving from [previousCode] into [currentCode] is an arrival the
+     * reader asked to hear about.
+     *
+     * The first check establishes where the reader is; it does not report an
+     * arrival. Without that, switching the warning on while sitting at home in
+     * a risky area fires immediately — "you are entering Dhaka North City" to
+     * someone who has been there all week. That is a false alarm, and it is the
+     * same one the geofence path avoids by not passing INITIAL_TRIGGER_ENTER.
+     *
+     * Staying put is not entering either. Only a change of area counts, which
+     * is what makes this an entry warning rather than a daily nag about where
+     * the reader lives.
+     */
+    internal fun isEntryWorthWarning(
+        previousCode: String?,
+        currentCode: String,
+        risk: RiskLevel,
+        threshold: RiskLevel,
+    ): Boolean =
+        previousCode != null && previousCode != currentCode && risk.ordinal >= threshold.ordinal
 
     /** Forget where we were, so the next check treats the area as newly entered. */
     fun reset(context: Context) {

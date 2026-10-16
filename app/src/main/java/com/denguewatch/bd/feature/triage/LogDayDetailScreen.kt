@@ -16,7 +16,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.size
+import com.denguewatch.bd.ui.theme.icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -215,8 +219,9 @@ private fun Header(title: String, time: String) {
  * ones out of range: a log is read for which way things went — a platelet
  * count that fell, a fever that rose — and "Outside the usual range" could not
  * say which. A reading is green in its usual range and amber to red outside
- * it, as in My health; the word below says the same, so colour is never the
- * only signal. A test result has no range, and stays in neutral ink.
+ * it, as in My health; the word below and the mark beside the number say the
+ * same, so colour is never the only signal. A test result has no range, and
+ * stays in neutral ink.
  *
  * [side] is null for a test result, which has no range to fall either side of.
  */
@@ -270,6 +275,20 @@ private fun MeasureRow(
                 color = ink,
                 modifier = Modifier.alignByBaseline(),
             )
+            if (side != null) {
+                // A mark on every reading, a tick for a normal one, as on iOS:
+                // green beside red must never be the only thing telling them
+                // apart, which for a red-green colour-blind reader it is not.
+                Icon(
+                    status.icon,
+                    contentDescription = null,
+                    tint = ink,
+                    modifier = Modifier
+                        .padding(start = 3.dp)
+                        .size(13.dp)
+                        .align(Alignment.CenterVertically),
+                )
+            }
             ShrinkToFitText(
                 unit,
                 style = unitStyle,

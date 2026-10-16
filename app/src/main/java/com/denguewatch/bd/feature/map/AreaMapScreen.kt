@@ -219,7 +219,21 @@ private fun MapView(
         // happened under osmdroid. MapLibre behaves, but the clip costs nothing
         // and the failure it prevents is silent and ugly.
     val map = @Composable { mapModifier: Modifier ->
-        Box(mapModifier.clipToBounds()) {
+        Box(
+            mapModifier
+                .clipToBounds()
+                // The reader's position is a dot drawn inside the map's own
+                // layers, which TalkBack cannot reach. iOS labels that marker
+                // "Your location"; here the map says it, with the area.
+                .semantics {
+                    if (location.lastKnownLocation != null) {
+                        contentDescription = listOfNotNull(
+                            loc.t("map.youAreHere.a11y"),
+                            currentArea?.let { loc.t("map.you.inArea", it.displayName(loc.language)) },
+                        ).joinToString(", ")
+                    }
+                },
+        ) {
             MapLibreRiskMap(
                 areas = store.areas,
                 metric = metric,

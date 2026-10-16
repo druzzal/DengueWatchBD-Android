@@ -283,9 +283,9 @@ fun FluidEntryScreen(
 ) {
     val loc = LocalLocalization.current
     val colors = Dw.colors
-    var kind by remember { mutableStateOf(FluidEntry.Kind.DRINK) }
-    var millilitres by remember { mutableIntStateOf(200) }
-    var takenAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var kind by rememberSaveable { mutableStateOf(FluidEntry.Kind.DRINK) }
+    var millilitres by rememberSaveable { mutableIntStateOf(200) }
+    var takenAt by rememberSaveable { mutableLongStateOf(System.currentTimeMillis()) }
 
     fun save() {
         state.fluids.add(

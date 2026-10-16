@@ -222,3 +222,15 @@ val RiskLevel.icon: ImageVector
         RiskLevel.HIGH -> DwIcons.riskHigh
         RiskLevel.SEVERE -> DwIcons.riskSevere
     }
+
+/**
+ * The mark beside a reading: a tick in its usual range, a triangle outside it,
+ * an octagon well outside — the shapes iOS draws, so green and red are never
+ * the only thing telling a normal reading from one that is not.
+ */
+val com.denguewatch.bd.model.MeasureStatus.icon: ImageVector
+    get() = when (this) {
+        com.denguewatch.bd.model.MeasureStatus.NORMAL -> Icons.Filled.CheckCircle
+        com.denguewatch.bd.model.MeasureStatus.OUTSIDE -> Icons.Filled.Warning
+        com.denguewatch.bd.model.MeasureStatus.FAR_OUTSIDE -> Icons.Filled.Dangerous
+    }

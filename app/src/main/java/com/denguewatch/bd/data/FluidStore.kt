@@ -17,9 +17,10 @@ import java.io.File
  * Same shape and same promise as [VitalsStore]: nothing leaves the phone, no
  * account. Newest first, sorted on both write and read.
  */
-class FluidStore(context: Context, filename: String = "fluids.json") {
+class FluidStore(private val file: File) {
 
-    private val file = File(context.applicationContext.filesDir, filename)
+    constructor(context: Context, filename: String = "fluids.json") :
+        this(File(context.applicationContext.filesDir, filename))
 
     var entries: List<FluidEntry> by mutableStateOf(emptyList())
         private set

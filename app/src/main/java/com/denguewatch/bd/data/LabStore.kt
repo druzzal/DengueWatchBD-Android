@@ -15,9 +15,10 @@ import java.io.File
 /**
  * Lab reports as the reader entered them. See `VitalsStore` on ordering.
  */
-class LabStore(context: Context, filename: String = "lab-reports.json") {
+class LabStore(private val file: File) {
 
-    private val file = File(context.applicationContext.filesDir, filename)
+    constructor(context: Context, filename: String = "lab-reports.json") :
+        this(File(context.applicationContext.filesDir, filename))
 
     var reports: List<LabReport> by mutableStateOf(emptyList())
         private set

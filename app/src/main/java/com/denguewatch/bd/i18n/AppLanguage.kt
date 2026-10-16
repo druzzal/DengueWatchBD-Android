@@ -127,6 +127,22 @@ data class NumberStyle(val language: AppLanguage) {
         }
     }
 
+    /**
+     * Several names as one phrase — "A, B, and C", "A, B এবং C" — the way
+     * iOS's `ListFormatter` writes them for each language (CLDR's standard
+     * list patterns). A plain comma list read as unfinished in a sentence.
+     */
+    fun list(items: List<String>): String {
+        val and = if (language == AppLanguage.BANGLA) " এবং " else " and "
+        return when (items.size) {
+            0 -> ""
+            1 -> items[0]
+            2 -> items[0] + and + items[1]
+            else -> items.dropLast(1).joinToString(", ") +
+                (if (language == AppLanguage.BANGLA) and else ",$and") + items.last()
+        }
+    }
+
     fun percentChange(value: Double?): String {
         if (value == null) return "—"
         val sign = if (value >= 0) "+" else "−"
