@@ -74,7 +74,7 @@ class LocalizationReachabilityTest {
         VitalKind.entries.forEach { keys += it.labelKey; keys += it.unitKey }
         TemperatureUnit.entries.forEach { keys += it.labelKey }
         LabMeasure.entries.forEach { keys += it.labelKey; keys += it.unitKey }
-        DengueTest.entries.forEach { keys += it.labelKey }
+        DengueTest.entries.forEach { keys += it.labelKey; keys += it.usefulDaysKey }
         TestResult.entries.forEach { keys += it.labelKey }
         RiskLevel.entries.forEach {
             keys += it.labelKey; keys += it.guidanceKey; keys += it.headlineKey
@@ -158,46 +158,7 @@ class LocalizationReachabilityTest {
 }
 
 private val KNOWN_ORPHANS = setOf(
-    // ---------------------------------------------------------------------
-    // Copy waiting on a feature iOS has and this app does not yet.
-    //
-    // These are translated and correct; deleting them would throw away work
-    // that the port still needs. They are listed so a *new* orphan fails the
-    // build rather than joining them unnoticed.
-    // ---------------------------------------------------------------------
-    // When each serology test is actually informative.
-    "lab.timing.igg", "lab.timing.igm", "lab.timing.ns1",
-    // The location permission explainer sheet.
-    "locperm.allow", "locperm.body", "locperm.notNow", "locperm.reason1",
-    "locperm.reason2", "locperm.reason3", "locperm.title",
-    // States the nearby-hospital card does not have yet; it ships the title,
-    // subtitle and search action only.
-    "care.nearby.distance", "care.nearby.empty", "care.nearby.enable",
-    "care.nearby.permission", "care.nearby.searching",
-    // The fever timeline's spoken description and its critical-phase note.
-    "phase.a11y.day", "phase.a11y.unknown", "phase.critical.note",
-    // Map states and geofence status lines.
-    "geo.status.foreground", "geo.status.off", "map.legend.risk",
-    "map.you.outside", "map.you.wholeCountry",
-    // The unit picker's own label.
-    "temp.unit.label",
-    // Odds and ends with no home yet.
-    "common.ok", "common.saved", "common.today", "common.yesterday",
-    "health.title", "intro.language",
-
-    // ---------------------------------------------------------------------
-    // Dead copy: features that were removed here and on iOS, where the iOS
-    // reachability test deleted the matching keys. Kept on this list rather
-    // than deleted so the two tables stay comparable while the port finishes;
-    // they can go once the parity diff is closed.
-    // ---------------------------------------------------------------------
-    "health.latest.title", "health.today.done", "health.today.subtitle",
-    "health.today.symptoms", "health.today.title", "health.today.todo",
-    "health.today.vitals",
-    "check.fever.section", "check.intro", "check.risk.section", "check.seeResult",
-    "guidance.care", "guidance.check", "guidance.prevent", "guidance.title",
-    "result.addToLog", "result.keptOnPhone", "result.saveEntry", "result.temperature",
-    "tab.check", "tab.overview", "step.skip", "geo.prompt.enabled",
-    "temp.outOfRange", "vital.outsideUsual", "vital.usualRange",
-    "lab.outsideTypical", "lab.typicalRange", "who.plan.subtitle",
+    // Read only from inside i18n — Localization.dayAndTime — which this scan
+    // deliberately skips, so it cannot see them.
+    "common.today", "common.yesterday",
 )

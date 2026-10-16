@@ -77,6 +77,7 @@ import com.denguewatch.bd.feature.triage.CaseLogScreen
 import com.denguewatch.bd.feature.triage.LogDayDetailScreen
 import com.denguewatch.bd.feature.triage.SymptomCheckerScreen
 import com.denguewatch.bd.feature.triage.TriageEngine
+import com.denguewatch.bd.feature.location.LocationPermissionSheet
 import com.denguewatch.bd.feature.triage.TriageOutcome
 import com.denguewatch.bd.feature.triage.TriageResultScreen
 import com.denguewatch.bd.i18n.LocalLanguage
@@ -192,6 +193,7 @@ private fun MainScaffold(
     var feverDaysAgo by rememberSaveable { mutableStateOf<Int?>(null) }
 
     var riskSheet by remember { mutableStateOf<RiskSheetArgs?>(null) }
+    var explainingLocation by rememberSaveable { mutableStateOf(false) }
 
     val outcome = remember(selectedSymptoms, triageContext, feverDaysAgo) {
         TriageEngine.evaluate(
@@ -391,7 +393,8 @@ private fun MainScaffold(
                             onRequestBackgroundLocation = onRequestBackgroundLocation,
                             showsList = showsList,
                             onOpenArea = { destination = Destination.AreaDetail(it.code) },
-                            onRequestLocation = onRequestLocation,
+                            // Explained first, as on iOS: see LocationPermissionSheet.
+                            onRequestLocation = { explainingLocation = true },
                             contentPadding = content,
                         )
 
@@ -607,6 +610,13 @@ Destination.SymptomCheck -> SymptomCheckerScreen(
         }
         }
     }
+    }
+
+    if (explainingLocation) {
+        LocationPermissionSheet(
+            onAllow = onRequestLocation,
+            onDismiss = { explainingLocation = false },
+        )
     }
 
     riskSheet?.let { args ->

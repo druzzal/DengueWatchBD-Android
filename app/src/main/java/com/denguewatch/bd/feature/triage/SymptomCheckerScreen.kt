@@ -380,6 +380,7 @@ private fun TimelineStep(feverDaysAgo: Int?, onFeverDaysChange: (Int?) -> Unit) 
                         color = colors.secondaryText,
                     )
                 }
+                FeverTimelineTrack(feverDay = feverDaysAgo + 1)
             }
         }
     }

@@ -304,12 +304,25 @@ fun FirstRunDisclaimer(
         }
 
         item {
-            SegmentedPicker(
-                options = AppLanguage.entries,
-                selected = loc.language,
-                label = { it.nativeName },
-                onSelect = { loc.set(it) },
-            )
+            // Asked in words above the choice, as on iOS, so a reader who
+            // cannot yet read one of the two scripts still knows what the
+            // two buttons are for.
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Space.tight),
+            ) {
+                Text(
+                    loc.t("intro.language"),
+                    style = typo(Typo.CAPTION),
+                    color = colors.secondaryText,
+                )
+                SegmentedPicker(
+                    options = AppLanguage.entries,
+                    selected = loc.language,
+                    label = { it.nativeName },
+                    onSelect = { loc.set(it) },
+                )
+            }
         }
 
         (1..4).forEach { index ->

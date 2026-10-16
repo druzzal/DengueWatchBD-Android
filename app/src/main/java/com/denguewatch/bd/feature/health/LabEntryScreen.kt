@@ -315,11 +315,17 @@ private fun TestResultRow(
                 .clickable(role = Role.Button) { open = true },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                loc.t(test.labelKey),
-                style = typo(Typo.CALLOUT),
-                modifier = Modifier.weight(1f),
-            )
+            // The test's name, and when it is usually informative — the
+            // timing the section's footnote refers to, which used to be
+            // translated and never shown, here or on iOS.
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(loc.t(test.labelKey), style = typo(Typo.CALLOUT))
+                Text(
+                    loc.t(test.usefulDaysKey),
+                    style = typo(Typo.MICRO),
+                    color = colors.secondaryText,
+                )
+            }
             Text(
                 loc.t(selected.labelKey),
                 style = typo(Typo.CALLOUT),

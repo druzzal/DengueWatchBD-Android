@@ -1,5 +1,7 @@
 package com.denguewatch.bd.feature.health
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -143,6 +145,8 @@ fun VitalsEntryScreen(
                     options = TemperatureUnit.entries,
                     selected = unit,
                     label = { it.symbol },
+                    // "°C, °F" alone does not say what is being chosen.
+                    modifier = Modifier.semantics { contentDescription = loc.t("temp.unit.label") },
                     // Stored Celsius either way, so switching re-labels the
                     // record rather than rewriting it.
                     onSelect = { next ->

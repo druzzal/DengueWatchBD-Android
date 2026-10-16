@@ -186,6 +186,8 @@ fun MapLibreRiskMap(
     userLocation: Pair<Double, Double>? = null,
     recenterKey: Int = 0,
     recenterZoom: Double? = null,
+    /** Bumped to fit the whole country back on screen. */
+    fitCountryKey: Int = 0,
     /**
      * False turns the map into a picture: no panning, no zooming, no taps.
      *
@@ -362,6 +364,13 @@ fun MapLibreRiskMap(
             )
         }
         map.animateCamera(update, 700)
+    }
+
+    // Back out to all ten areas, as iOS's "whole country" button does.
+    LaunchedEffect(fitCountryKey) {
+        if (fitCountryKey <= 0) return@LaunchedEffect
+        val map = mapRef[0] ?: return@LaunchedEffect
+        map.animateCamera(CameraUpdateFactory.newLatLngBounds(countryBounds, fitPadding), 700)
     }
 }
 

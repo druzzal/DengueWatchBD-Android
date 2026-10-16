@@ -87,6 +87,13 @@ enum class DengueTest {
         }
 
     val labelKey: String get() = "lab.test.$slug"
+
+    /**
+     * When this test is usually informative, counting the first day of fever
+     * as day 1. A fact about the assay, not an interpretation of anybody's
+     * result.
+     */
+    val usefulDaysKey: String get() = "lab.timing.$slug"
 }
 
 enum class TestResult {

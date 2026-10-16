@@ -132,16 +132,25 @@ fun TriageResultScreen(
                     color = colors.secondaryText,
                 )
                 TriageEngine.phaseKey(feverDaysAgo)?.let { key ->
-                    Text(
-                        loc.t(key, loc.num((feverDaysAgo ?: 0) + 1)),
-                        style = typo(Typo.CAPTION),
-                        color = colors.secondaryText,
-                        modifier = Modifier
+                    // The phase in words, then drawn: the sentence says which
+                    // phase this is; the track shows how much of the illness
+                    // is still to come, which is what makes the critical
+                    // window legible. As on iOS.
+                    Column(
+                        Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(11.dp))
                             .background(accent.copy(alpha = 0.10f))
                             .padding(11.dp),
-                    )
+                        verticalArrangement = Arrangement.spacedBy(Space.row),
+                    ) {
+                        Text(
+                            loc.t(key, loc.num((feverDaysAgo ?: 0) + 1)),
+                            style = typo(Typo.CAPTION),
+                            color = colors.secondaryText,
+                        )
+                        FeverTimelineTrack(feverDay = (feverDaysAgo ?: 0) + 1)
+                    }
                 }
             }
         }

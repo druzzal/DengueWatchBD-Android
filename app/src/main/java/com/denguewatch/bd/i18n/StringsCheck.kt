@@ -6,8 +6,6 @@ package com.denguewatch.bd.i18n
 
 internal val enCheck: Map<String, String> = mapOf(
     "check.title" to "Symptom check",
-    "check.intro" to "Tick everything you have felt in the last 24 hours. This is a guide based on WHO dengue criteria, not a diagnosis.",
-    "check.seeResult" to "See what to do",
     "check.clearAll" to "Clear all",
     "symptom.group.core" to "Core symptoms",
     "symptom.group.warning" to "Dengue warning signs",
@@ -43,7 +41,6 @@ internal val enCheck: Map<String, String> = mapOf(
     "symptom.confusion.detail" to "Altered consciousness.",
     "symptom.heavyBleed.title" to "Heavy bleeding",
     "symptom.heavyBleed.detail" to "Vomiting blood, black stools, or heavy vaginal bleeding.",
-    "check.fever.section" to "Your fever",
     "check.fever.knowDate" to "I know when the fever started",
     "check.fever.started" to "Fever started",
     "check.phase.febrile" to "Day %s of fever — febrile phase. An NS1 test works best now.",
@@ -61,7 +58,6 @@ internal val enCheck: Map<String, String> = mapOf(
     "fever.timeline.day" to "Day %s",
     "fever.timeline.note" to "The critical phase is days 4 to 7, around the time the fever drops. Feeling better then does not mean the danger has passed.",
     "check.phase.recovery" to "Day %s of fever — recovery phase for most people, but watch for fluid overload and lingering fatigue.",
-    "check.risk.section" to "Anything that raises your risk",
     "check.risk.pregnant" to "Pregnant",
     "check.risk.age" to "Under 5 or over 60 years old",
     "check.risk.chronic" to "Diabetes, heart, kidney or liver condition",
@@ -93,11 +89,7 @@ internal val enCheck: Map<String, String> = mapOf(
     "result.whatToDo" to "What to do now",
     "result.call999" to "Call 999",
     "result.findHospital" to "Find the nearest hospital",
-    "result.addToLog" to "Add this to your log",
-    "result.keptOnPhone" to "Kept on this phone only",
-    "result.temperature" to "Temperature (°C), optional",
     "result.note" to "Note, optional",
-    "result.saveEntry" to "Save entry",
     "result.disclaimer" to "DengueWatch cannot diagnose dengue. Only a clinician and a blood test can. If you feel worse at any point, go to a hospital regardless of what this screen says.",
     "log.title" to "My log",
     "log.empty.title" to "No entries yet",
@@ -125,7 +117,6 @@ internal val enCheck: Map<String, String> = mapOf(
     "step.back" to "Back",
     "step.seeResult" to "See what to do",
     "step.progress" to "Step %s of %s",
-    "step.skip" to "Skip",
     // My log: the day record, how it is ordered, renamed and exported,
     // and how a reading reads against its usual range. Ported from the iOS
     // tables with the keys unchanged.
@@ -189,8 +180,6 @@ internal val enCheck: Map<String, String> = mapOf(
 
 internal val bnCheck: Map<String, String> = mapOf(
     "check.title" to "উপসর্গ পরীক্ষা",
-    "check.intro" to "গত ২৪ ঘণ্টায় আপনার যা যা হয়েছে সব চিহ্নিত করুন। এটি বিশ্ব স্বাস্থ্য সংস্থার নির্দেশনার ভিত্তিতে একটি দিকনির্দেশ, রোগনির্ণয় নয়।",
-    "check.seeResult" to "কী করণীয় দেখুন",
     "check.clearAll" to "সব মুছুন",
     "symptom.group.core" to "প্রধান উপসর্গ",
     "symptom.group.warning" to "ডেঙ্গুর বিপদচিহ্ন",
@@ -226,7 +215,6 @@ internal val bnCheck: Map<String, String> = mapOf(
     "symptom.confusion.detail" to "জ্ঞানের পরিবর্তন।",
     "symptom.heavyBleed.title" to "প্রচণ্ড রক্তক্ষরণ",
     "symptom.heavyBleed.detail" to "রক্তবমি, কালো পায়খানা বা অতিরিক্ত যোনিপথে রক্তক্ষরণ।",
-    "check.fever.section" to "আপনার জ্বর",
     "check.fever.knowDate" to "জ্বর কবে শুরু হয়েছে আমি জানি",
     "check.fever.started" to "জ্বর শুরু হয়েছে",
     "check.phase.febrile" to "জ্বরের %s দিন — জ্বরের পর্যায়। এখনই NS1 পরীক্ষা সবচেয়ে কার্যকর।",
@@ -242,7 +230,6 @@ internal val bnCheck: Map<String, String> = mapOf(
     "fever.timeline.day" to "দিন %s",
     "fever.timeline.note" to "সংকটকাল জ্বরের ৪ থেকে ৭ দিন — সাধারণত যখন জ্বর নামতে শুরু করে। তখন ভালো লাগা মানেই বিপদ কেটে যাওয়া নয়।",
     "check.phase.recovery" to "জ্বরের %s দিন — বেশিরভাগ মানুষের সুস্থ হওয়ার পর্যায়, তবে শরীরে পানি জমা ও দীর্ঘস্থায়ী দুর্বলতার দিকে খেয়াল রাখুন।",
-    "check.risk.section" to "যেসব কারণে ঝুঁকি বাড়ে",
     "check.risk.pregnant" to "গর্ভবতী",
     "check.risk.age" to "৫ বছরের কম বা ৬০ বছরের বেশি বয়স",
     "check.risk.chronic" to "ডায়াবেটিস, হৃদরোগ, কিডনি বা লিভারের সমস্যা",
@@ -274,11 +261,7 @@ internal val bnCheck: Map<String, String> = mapOf(
     "result.whatToDo" to "এখন যা করবেন",
     "result.call999" to "৯৯৯-এ ফোন করুন",
     "result.findHospital" to "নিকটতম হাসপাতাল খুঁজুন",
-    "result.addToLog" to "আপনার তালিকায় যোগ করুন",
-    "result.keptOnPhone" to "শুধু এই ফোনেই থাকবে",
-    "result.temperature" to "তাপমাত্রা (°সে), ঐচ্ছিক",
     "result.note" to "মন্তব্য, ঐচ্ছিক",
-    "result.saveEntry" to "সংরক্ষণ করুন",
     "result.disclaimer" to "ডেঙ্গুওয়াচ ডেঙ্গু নির্ণয় করতে পারে না। কেবল একজন চিকিৎসক ও রক্ত পরীক্ষাই তা পারে। যেকোনো সময় অবস্থা খারাপ মনে হলে এই পর্দা যা-ই বলুক, হাসপাতালে যান।",
     "log.title" to "আমার তালিকা",
     "log.empty.title" to "এখনো কিছু নেই",
@@ -306,7 +289,6 @@ internal val bnCheck: Map<String, String> = mapOf(
     "step.back" to "পেছনে",
     "step.seeResult" to "করণীয় দেখুন",
     "step.progress" to "ধাপ %s / %s",
-    "step.skip" to "এড়িয়ে যান",
     // My log: the day record, how it is ordered, renamed and exported,
     // and how a reading reads against its usual range. Ported from the iOS
     // tables with the keys unchanged.

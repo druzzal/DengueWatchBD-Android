@@ -62,6 +62,14 @@ byte for byte to the other repository
 repositories sit side by side in `~/Developer`, a test here fails if the two
 copies differ.
 
+`app/src/test/resources/shared-strings.json` does the same for the copy: every
+string key both apps carry, with its English and Bangla wording, plus the
+keys each app has on its own by design. `SharedStringsTest` fails when this
+app's tables disagree with it — a feature added here and not on iOS, or a
+phrase reworded on one side only — until the other app catches up or the
+difference is recorded in the file on purpose. Copy it between the
+repositories the same way.
+
 The plumbing has its own tests: the stores read and write real files in a
 temporary folder, the alert and digest timing is tested as plain functions,
 and `BackgroundScheduleTest` (instrumented) checks that re-applying the

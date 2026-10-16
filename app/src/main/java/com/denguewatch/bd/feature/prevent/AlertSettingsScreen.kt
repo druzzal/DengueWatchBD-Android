@@ -163,7 +163,13 @@ fun AlertSettingsScreen(
                     } else {
                         // The switch is on but nothing is armed. Saying so is the
                         // whole point: a warning that silently cannot fire is
-                        // worse than one the reader knows is off.
+                        // worse than one the reader knows is off. First what it
+                        // amounts to, in iOS's words, then how to fix it.
+                        Text(
+                            loc.t(if (state.location.isAuthorized) "geo.status.foreground" else "geo.status.off"),
+                            style = typo(Typo.CAPTION),
+                            color = colors.secondaryText,
+                        )
                         InlineNote(
                             icon = DwIcons.riskHigh,
                             detail = loc.t("geo.permissionDetail"),
