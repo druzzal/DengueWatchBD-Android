@@ -324,8 +324,11 @@ fun MyHealthScreen(
                     // zig-zagged.
                     val unitStyle = typo(Typo.MICRO)
                     val unitWidth = with(LocalDensity.current) { (unitStyle.fontSize * 4.2f).toDp() }
+                    // Each measure's most recent value, not the latest report's:
+                    // a report carrying only an NS1 result must not hide the
+                    // platelet count from the one before it. As on iOS.
                     LabMeasure.entries.forEach { measure ->
-                        val value = latest?.value(measure) ?: return@forEach
+                        val value = state.labs.mostRecent(measure)?.second ?: return@forEach
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 loc.t(measure.labelKey),
@@ -402,14 +405,16 @@ fun MyHealthScreen(
                         )
                     }
 
-                    // Serology, only where a test was actually done.
-                    val done = DengueTest.entries.filter {
-                        (latest?.result(it) ?: TestResult.NOT_DONE) != TestResult.NOT_DONE
+                    // Serology, only where a test was actually done: each test's
+                    // newest result, which may be on an older report than the
+                    // latest. A positive result takes the alarm ink, as on iOS;
+                    // the word beside it always says which it is.
+                    val results = DengueTest.entries.mapNotNull { test ->
+                        state.labs.mostRecentResult(test)?.let { test to it.second }
                     }
-                    if (done.isNotEmpty()) {
+                    if (results.isNotEmpty()) {
                         HairlineDivider()
-                        done.forEach { test ->
-                            val result = latest?.result(test) ?: TestResult.NOT_DONE
+                        results.forEach { (test, result) ->
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     loc.t(test.labelKey),
@@ -417,7 +422,15 @@ fun MyHealthScreen(
                                     color = colors.secondaryText,
                                     modifier = Modifier.weight(1f),
                                 )
-                                Text(loc.t(result.labelKey), style = typo(Typo.CALLOUT))
+                                Text(
+                                    loc.t(result.labelKey),
+                                    style = typo(Typo.CALLOUT),
+                                    color = if (result == TestResult.POSITIVE) {
+                                        colors.riskInk(RiskLevel.HIGH)
+                                    } else {
+                                        colors.primaryText
+                                    },
+                                )
                             }
                         }
                     }
@@ -512,13 +525,14 @@ internal val TriageOutcome.risk
         TriageOutcome.EMERGENCY -> RiskLevel.SEVERE
     }
 
-/** One reading, coloured only when it is outside its usual range. */
+/** One measure's most recent reading, on the risk palette, with when it was taken. */
 @Composable
 private fun VitalTile(state: AppState, kind: VitalKind, modifier: Modifier = Modifier) {
     val loc = LocalLocalization.current
     val colors = Dw.colors
     val unit = state.preferences.temperatureUnit
-    val stored = state.vitals.entries.firstNotNullOfOrNull { it.value(kind) }
+    val reading = state.vitals.entries.firstOrNull { it.value(kind) != null }
+    val stored = reading?.value(kind)
     val status = stored?.let { kind.status(it) }
 
     val shown = when {
@@ -546,6 +560,17 @@ private fun VitalTile(state: AppState, kind: VitalKind, modifier: Modifier = Mod
             if (stored != null) {
                 Text(unitLabel, style = typo(Typo.MICRO), color = colors.secondaryText)
             }
+        }
+        if (reading != null) {
+            // Per tile, because a card can mix a temperature from this morning
+            // with a blood pressure from two days ago, and the card's own
+            // subtitle only dates the newest entry. As on iOS.
+            ShrinkToFitText(
+                loc.dayAndTime(reading.dateMillis),
+                style = typo(Typo.MICRO),
+                color = colors.mutedInk,
+                minScale = 0.7f,
+            )
         }
         if (status != null) {
             // The word beside the colour, so green and red are never the only

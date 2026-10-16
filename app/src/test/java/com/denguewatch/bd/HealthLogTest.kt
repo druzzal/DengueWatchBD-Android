@@ -2,10 +2,13 @@ package com.denguewatch.bd
 
 import com.denguewatch.bd.model.HealthLog
 import com.denguewatch.bd.model.LabReport
+import com.denguewatch.bd.model.FluidEntry
 import com.denguewatch.bd.model.MeasureStatus
+import com.denguewatch.bd.model.TestResult
 import com.denguewatch.bd.model.VitalsEntry
 import java.util.Calendar
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -153,5 +156,39 @@ class HealthLogTest {
     fun `an empty record produces no days`() {
         assertTrue(HealthLog.days(emptyList(), emptyList()).isEmpty())
         assertTrue(HealthLog.numbers(emptyList()).isEmpty())
+    }
+
+    @Test
+    fun `a day with only a test result has no reading to be normal about`() {
+        // A positive NS1 on its own must not paint the day green or be read
+        // out as "in the usual range": a test result has no range.
+        val day = HealthLog.days(
+            vitals = emptyList(),
+            labs = listOf(LabReport(dateMillis = at(0, 10), ns1 = TestResult.POSITIVE)),
+        ).single()
+        assertFalse(day.hasReadings)
+    }
+
+    @Test
+    fun `a day with only fluids has no readings either`() {
+        val day = HealthLog.days(
+            vitals = emptyList(),
+            fluids = listOf(FluidEntry(dateMillis = at(0, 10), kind = FluidEntry.Kind.URINE)),
+        ).single()
+        assertFalse(day.hasReadings)
+    }
+
+    @Test
+    fun `a day with a count or a vital sign has readings`() {
+        assertTrue(
+            HealthLog.days(
+                vitals = emptyList(),
+                labs = listOf(LabReport(dateMillis = at(0, 10), platelets = 180.0)),
+            ).single().hasReadings,
+        )
+        assertTrue(
+            HealthLog.days(vitals = listOf(VitalsEntry(dateMillis = at(0, 10), pulse = 80.0)))
+                .single().hasReadings,
+        )
     }
 }

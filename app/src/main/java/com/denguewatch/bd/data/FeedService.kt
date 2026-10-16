@@ -47,7 +47,7 @@ class BundledFeedService(private val context: Context) {
     }
 
     suspend fun persist(text: String) = withContext(Dispatchers.IO) {
-        cacheFile.writeText(text)
+        cacheFile.writeTextAtomically(text)
     }
 
     private fun decode(text: String): FeedDocument {

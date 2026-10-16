@@ -182,9 +182,13 @@ object BackgroundRefresh {
 
         manager.enqueueUniquePeriodicWork(
             DIGEST_WORK,
-            // UPDATE here, unlike the refresh: the reader toggling this on
-            // expects the schedule to be (re)established from now.
-            ExistingPeriodicWorkPolicy.UPDATE,
+            // KEEP, like the refresh. This runs on every launch and resume, and
+            // UPDATE keeps the original enqueue time while taking the new,
+            // shorter delay — so each visit pulled the first digest earlier,
+            // and it went out on whatever day the reader happened to open the
+            // app rather than on Sunday. Switching the digest off cancels the
+            // work, so switching it back on still schedules from that moment.
+            ExistingPeriodicWorkPolicy.KEEP,
             request,
         )
     }

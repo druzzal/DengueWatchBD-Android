@@ -31,8 +31,15 @@ data class HealthLogDay(
 ) {
     val isEmpty: Boolean get() = vitals.isEmpty() && labs.isEmpty() && fluids.isEmpty()
 
-    /** Whether the day holds any reading that can be normal or not. */
-    val hasReadings: Boolean get() = vitals.isNotEmpty() || labs.isNotEmpty()
+    /**
+     * Whether the day holds any reading that can be normal or not.
+     *
+     * Values, not entries: a lab report holding only an NS1 result has no range
+     * to sit in, and counting it painted the day green and had TalkBack call it
+     * "in the usual range" — beside a positive test. As on iOS.
+     */
+    val hasReadings: Boolean
+        get() = vitals.any { !it.isEmpty } || labs.any { it.hasAnyValue }
 
     /** Everything recorded that day, newest first, so a day reads as one list. */
     val itemsNewestFirst: List<Item>

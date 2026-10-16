@@ -165,7 +165,7 @@ class CaseLogStore(context: Context, filename: String = "case-log.json") {
         runCatching {
             val array = JSONArray()
             entries.forEach { array.put(it.toJson()) }
-            file.writeText(array.toString())
+            file.writeTextAtomically(array.toString())
         }
     }
 }

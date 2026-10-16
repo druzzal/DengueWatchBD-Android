@@ -11,6 +11,10 @@ internal val enDashboard: Map<String, String> = mapOf(
     "who.female" to "Female",
     "who.share" to "%s%%",
     "who.a11y" to "Ages %s: %s male, %s female",
+    "risk.card.hereNow" to "%s, where you are now",
+    // DGHS reports ten areas for the whole country, so a located reading is
+    // an average over a division, not a neighbourhood.
+    "risk.card.covers" to "A single figure for this whole area — about %s people",
     "who.unrecorded" to "Not recorded",
     "who.a11y.unrecorded" to "%s with no sex recorded.",
     "dash.stat.last24" to "Last 24 hours",
@@ -66,6 +70,8 @@ internal val bnDashboard: Map<String, String> = mapOf(
     "who.female" to "নারী",
     "who.share" to "%s%%",
     "who.a11y" to "%s বছর: %s জন পুরুষ, %s জন নারী",
+    "risk.card.hereNow" to "%s, আপনি এখন যেখানে আছেন",
+    "risk.card.covers" to "পুরো এলাকার জন্য একটিই হিসাব — প্রায় %s মানুষ",
     "who.unrecorded" to "লেখা নেই",
     "who.a11y.unrecorded" to "%s জনের লিঙ্গ লেখা নেই।",
     "dash.stat.last24" to "গত ২৪ ঘণ্টা",

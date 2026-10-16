@@ -207,6 +207,10 @@ private fun LazyListScope.loadedContent(
                 change = focusArea.let { if (it != null) it.weeklyChange else store.weeklyCaseChange },
                 lastUpdatedMillis = store.lastUpdated,
                 incidence = focusArea?.incidencePer100k ?: nationalIncidence,
+                isCurrentLocation = state.focusIsCurrentLocation,
+                coverage = focusArea?.takeIf { state.focusIsCurrentLocation }?.let {
+                    loc.t("risk.card.covers", loc.compact(it.populationThousands * 1_000))
+                },
                 onClick = {
                     onOpenRiskDetail(
                         focusRisk,

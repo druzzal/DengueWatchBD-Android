@@ -475,7 +475,18 @@ private fun MainScaffold(
                         Tab.HEALTH -> MyHealthScreen(
                             modifier = Modifier.readableColumn(),
                             state = state,
-                            onOpenCheck = { destination = Destination.SymptomCheck },
+                            onOpenCheck = {
+                                // A new check starts empty, as on iOS, where
+                                // the checker is a sheet with its own state.
+                                // The result screen clears the answers as it
+                                // closes, but a check abandoned part-way never
+                                // reaches it, and its ticks were being carried
+                                // silently into the next one.
+                                selectedSymptoms = emptySet()
+                                triageContext = TriageEngine.Context()
+                                feverDaysAgo = null
+                                destination = Destination.SymptomCheck
+                            },
                             onOpenCheckHistory = { destination = Destination.CheckHistory },
                             onAddDrink = { destination = Destination.AddFluid },
                             onOpenLog = { destination = Destination.CaseLog },

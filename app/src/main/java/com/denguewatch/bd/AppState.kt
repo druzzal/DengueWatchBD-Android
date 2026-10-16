@@ -177,12 +177,24 @@ class AppState(context: Context) : ViewModel() {
     }
 
     /**
-     * The area the reader is being told about: their chosen area, else the area
-     * they are standing in, else nothing (which the UI reads as nationwide).
+     * The area the home card reads for: where the reader is now when the phone
+     * can say so, and their chosen area otherwise. Nothing means nationwide.
+     *
+     * Location comes first deliberately, as on iOS. "The risk here" is the
+     * question that card answers, and someone who has travelled to a district
+     * with an outbreak needs that district's reading, not the one they picked
+     * at home last month. The card always names the area it is reading, and
+     * says when it is the one the reader is standing in.
      */
     val focusArea
-        get() = store.area(preferences.homeAreaCode)
-            ?: location.lastKnownLocation?.let { (lat, lon) -> store.nearestArea(lat, lon) }
+        get() = currentArea ?: store.area(preferences.homeAreaCode)
+
+    /** True when [focusArea] came from the phone's own position. */
+    val focusIsCurrentLocation: Boolean
+        get() = currentArea != null
+
+    private val currentArea
+        get() = location.lastKnownLocation?.let { (lat, lon) -> store.nearestArea(lat, lon) }
 
     class Factory(private val context: Context) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

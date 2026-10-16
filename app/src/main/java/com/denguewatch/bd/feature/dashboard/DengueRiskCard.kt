@@ -69,6 +69,14 @@ fun DengueRiskCard(
     lastUpdatedMillis: Long?,
     modifier: Modifier = Modifier,
     incidence: Double? = null,
+    /** The area was found from the phone's position rather than chosen. */
+    isCurrentLocation: Boolean = false,
+    /**
+     * How many people the figure covers, said when the area came from the
+     * phone: a located reading is an average over a whole division, not the
+     * reader's neighbourhood.
+     */
+    coverage: String? = null,
     reduceMotion: Boolean = false,
     onClick: () -> Unit,
 ) {
@@ -94,7 +102,8 @@ fun DengueRiskCard(
     val summary = buildList {
         add(loc.t("risk.card.title"))
         add(loc.t(risk.labelKey))
-        add(areaName)
+        add(if (isCurrentLocation) loc.t("risk.card.hereNow", areaName) else areaName)
+        if (coverage != null) add(coverage)
         if (incidence != null) add(loc.t("risk.a11y.rate", loc.decimal(incidence)))
         add(loc.t(trendKey))
         add(loc.t(risk.guidanceKey))
@@ -163,11 +172,31 @@ fun DengueRiskCard(
                 )
                 Icon(risk.icon, contentDescription = null, tint = ink, modifier = Modifier.size(24.dp))
             }
-            Text(
-                areaName,
-                style = typo(Typo.SUBHEADLINE),
-                color = colors.secondaryText,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (isCurrentLocation) {
+                    Icon(
+                        DwIcons.myLocation,
+                        contentDescription = null,
+                        tint = colors.secondaryText,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
+                Text(
+                    areaName,
+                    style = typo(Typo.SUBHEADLINE),
+                    color = colors.secondaryText,
+                )
+            }
+            if (coverage != null) {
+                Text(
+                    coverage,
+                    style = typo(Typo.MICRO),
+                    color = colors.mutedInk,
+                )
+            }
         }
 
         RiskMeter(risk = risk, height = 7.dp)

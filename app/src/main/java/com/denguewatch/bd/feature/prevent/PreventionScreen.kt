@@ -370,7 +370,13 @@ private fun MythCard(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable(role = Role.Button, onClick = onToggle),
+                    .clickable(role = Role.Button, onClick = onToggle)
+                    // Open or closed is otherwise only the chevron's angle,
+                    // which TalkBack cannot see. As on iOS.
+                    .semantics {
+                        stateDescription =
+                            loc.t(if (isOpen) "common.expanded" else "common.collapsed")
+                    },
                 horizontalArrangement = Arrangement.spacedBy(13.dp),
                 verticalAlignment = Alignment.Top,
             ) {
@@ -534,7 +540,13 @@ private fun TopicCard(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable(role = Role.Button, onClick = onToggle),
+                    .clickable(role = Role.Button, onClick = onToggle)
+                    // Open or closed is otherwise only the chevron's angle,
+                    // which TalkBack cannot see. As on iOS.
+                    .semantics {
+                        stateDescription =
+                            loc.t(if (isOpen) "common.expanded" else "common.collapsed")
+                    },
                 horizontalArrangement = Arrangement.spacedBy(13.dp),
                 verticalAlignment = Alignment.Top,
             ) {

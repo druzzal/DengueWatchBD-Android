@@ -48,6 +48,12 @@ class LabStore(context: Context, filename: String = "lab-reports.json") {
             .sortedBy { it.first }
 
     /**
+     * The newest value recorded for this measure, which may come from an older
+     * report than [latest] if the most recent one did not include it.
+     */
+    fun mostRecent(measure: LabMeasure): Pair<Long, Double>? = series(measure).lastOrNull()
+
+    /**
      * The newest report that actually recorded this test, which may be older
      * than `latest` if the most recent report did not include it.
      */
@@ -67,7 +73,7 @@ class LabStore(context: Context, filename: String = "lab-reports.json") {
         runCatching {
             val array = JSONArray()
             reports.forEach { array.put(it.toJson()) }
-            file.writeText(array.toString())
+            file.writeTextAtomically(array.toString())
         }
     }
 }
