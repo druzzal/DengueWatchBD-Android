@@ -118,15 +118,24 @@ fun SecondaryActionButton(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(horizontal = Space.card, vertical = Space.row),
+            // Row-sized side padding, not card-sized: the content is centred
+            // anyway, and in a half-width pair ("Add a drink" beside "Passed
+            // urine") card padding left the words too little room and they
+            // broke onto two lines where iOS fits them on one.
+            .padding(horizontal = Space.tight, vertical = Space.row),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
             Icon(icon, contentDescription = null, tint = fill, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(Space.tight))
+            Spacer(Modifier.width(6.dp))
         }
-        Text(title, style = typo(Typo.SUBHEADLINE, FontWeight.SemiBold), color = fill)
+        Text(
+            title,
+            style = typo(Typo.SUBHEADLINE, FontWeight.SemiBold),
+            color = fill,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

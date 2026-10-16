@@ -105,8 +105,37 @@ class Localization(context: Context) {
         style.dayAndTime(millis, t("common.today"), t("common.yesterday"))
     fun relative(millis: Long) = style.relative(millis)
 
-    private companion object {
-        const val STORAGE_KEY = "appLanguage"
+    /**
+     * How old a DGHS report is, in calendar days: "today", "yesterday",
+     * "3 days ago".
+     *
+     * The feed dates a report by day, with no time attached, so "Updated 22
+     * hours ago" claimed a precision the figures do not have — and read
+     * differently from iOS, which counted the same date from a different
+     * midnight. Both now say it in days.
+     */
+    fun reportAge(reportDayMillis: Long, today: java.time.LocalDate = java.time.LocalDate.now()): String {
+        return when (val days = reportAgeInDays(reportDayMillis, today)) {
+            0 -> t("common.today").lowercase(language.locale)
+            1 -> t("common.yesterday").lowercase(language.locale)
+            else -> style.relative(System.currentTimeMillis() - days * 86_400_000L)
+        }
+    }
+
+    companion object {
+        private const val STORAGE_KEY = "appLanguage"
+
+        /**
+         * Whole calendar days from a report's date to [today]. The feed's dates
+         * are read at UTC midnight (see FeedDate), so the date is taken back
+         * out in UTC — never shifted by the phone's zone. A future date counts
+         * as today.
+         */
+        fun reportAgeInDays(reportDayMillis: Long, today: java.time.LocalDate): Int {
+            val reportDay = java.time.Instant.ofEpochMilli(reportDayMillis)
+                .atZone(java.time.ZoneOffset.UTC).toLocalDate()
+            return java.time.temporal.ChronoUnit.DAYS.between(reportDay, today).toInt().coerceAtLeast(0)
+        }
     }
 }
 

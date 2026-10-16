@@ -385,6 +385,8 @@ private fun MainScaffold(
                             onOpenRiskDetail = { risk, name, incidence, cases ->
                                 riskSheet = RiskSheetArgs(risk, name, incidence, cases)
                             },
+                            onRequestLocation = onRequestLocation,
+                            locationDenied = locationDenied,
                             contentPadding = content,
                         )
 

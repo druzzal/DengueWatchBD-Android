@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.denguewatch.bd.AppState
 import com.denguewatch.bd.Tab
 import com.denguewatch.bd.data.DengueStore
+import com.denguewatch.bd.feature.location.LocationPermissionCard
 import com.denguewatch.bd.data.FeedSync
 import com.denguewatch.bd.feature.shared.AlertCard
 import com.denguewatch.bd.feature.shared.ChartSkeleton
@@ -79,6 +80,8 @@ fun DashboardScreen(
     onOpenArea: (Area) -> Unit,
     onOpenRiskDetail: (RiskLevel, String, Double, Int) -> Unit,
     modifier: Modifier = Modifier,
+    onRequestLocation: () -> Unit = {},
+    locationDenied: Boolean = false,
     contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
     val loc = LocalLocalization.current
@@ -146,6 +149,7 @@ fun DashboardScreen(
                     loadedContent(
                         state, loc, focusArea, focusRisk, focusAreaName, nationalIncidence,
                         trendRange, { trendRange = it }, onOpenArea, onOpenRiskDetail, scope,
+                        onRequestLocation, locationDenied,
                     )
                 }
             }
@@ -153,6 +157,7 @@ fun DashboardScreen(
             is DengueStore.LoadState.Loaded -> loadedContent(
                 state, loc, focusArea, focusRisk, focusAreaName, nationalIncidence,
                 trendRange, { trendRange = it }, onOpenArea, onOpenRiskDetail, scope,
+                onRequestLocation, locationDenied,
             )
         }
 
@@ -172,6 +177,8 @@ private fun LazyListScope.loadedContent(
     onOpenArea: (Area) -> Unit,
     onOpenRiskDetail: (RiskLevel, String, Double, Int) -> Unit,
     scope: CoroutineScope,
+    onRequestLocation: () -> Unit,
+    locationDenied: Boolean,
 ) {
     val store = state.store
 
@@ -203,10 +210,18 @@ private fun LazyListScope.loadedContent(
                 },
             )
 
-            if (focusArea == null) {
-                // Without an area the reading is national, which is much less
-                // useful than a local one. Offer the fix rather than silently
-                // showing a country-wide number.
+            if (focusArea == null && !state.location.isAuthorized) {
+                // The reading is national, which is much less useful than a
+                // local one. Say what location is for before Android asks, and
+                // always leave the manual route open — as iOS does.
+                LocationPermissionCard(
+                    denied = locationDenied,
+                    onAllow = onRequestLocation,
+                    onChooseManually = { state.show(Tab.MAP) },
+                )
+            } else if (focusArea == null) {
+                // Allowed, but no fix yet or the reader is outside Bangladesh.
+                // The picker is the only route left.
                 ChooseAreaHint(onClick = { state.show(Tab.MAP) })
             }
 

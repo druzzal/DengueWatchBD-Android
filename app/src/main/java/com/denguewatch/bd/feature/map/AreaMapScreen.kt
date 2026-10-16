@@ -362,6 +362,35 @@ private fun MapView(
                 style = typo(Typo.MICRO),
                 color = colors.secondaryText,
             )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Space.row),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                // What a circle's size stands for, at the sizes the map draws
+                // — the same three samples iOS shows. Without a key the size
+                // was a shape to guess at.
+                val maxValue = maxOf(store.areas.maxOfOrNull { metric.value(it) } ?: 1.0, 1.0)
+                listOf(0.08, 0.35, 1.0).forEach { fraction ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        val radius = 5.0 + 22.0 * kotlin.math.sqrt(fraction)
+                        Box(
+                            Modifier
+                                .size((radius * 2).dp)
+                                .clip(CircleShape)
+                                .background(colors.mutedInk.copy(alpha = 0.30f)),
+                        )
+                        Text(
+                            if (metric == MapMetric.TOTAL) loc.compact((maxValue * fraction).toInt())
+                            else loc.decimal(maxValue * fraction, 0),
+                            style = typo(Typo.MICRO),
+                            color = colors.secondaryText,
+                        )
+                    }
+                }
+            }
             // Named, as iOS names it: the colours are the risk band, not the
             // number of cases the circle sizes show.
             Text(

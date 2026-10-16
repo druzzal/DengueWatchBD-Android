@@ -156,7 +156,7 @@ fun AreaRiskSheet(
                         Spacer(Modifier.weight(1f))
                         if (lastUpdated != null) {
                             Text(
-                                loc.t("risk.card.updated", loc.relative(lastUpdated)),
+                                loc.t("risk.card.updated", loc.reportAge(lastUpdated)),
                                 style = typo(Typo.MICRO),
                                 color = colors.secondaryText,
                             )

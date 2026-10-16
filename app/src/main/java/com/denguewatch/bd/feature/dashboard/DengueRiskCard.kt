@@ -108,7 +108,7 @@ fun DengueRiskCard(
         add(loc.t(trendKey))
         add(loc.t(risk.guidanceKey))
         if (lastUpdatedMillis != null) {
-            add(loc.t("risk.card.updated", loc.relative(lastUpdatedMillis)))
+            add(loc.t("risk.card.updated", loc.reportAge(lastUpdatedMillis)))
         }
     }.joinToString(", ")
 
@@ -223,7 +223,7 @@ fun DengueRiskCard(
             if (lastUpdatedMillis != null) {
                 Text("·", style = typo(Typo.CAPTION), color = colors.tertiaryText)
                 Text(
-                    loc.t("risk.card.updated", loc.relative(lastUpdatedMillis)),
+                    loc.t("risk.card.updated", loc.reportAge(lastUpdatedMillis)),
                     style = typo(Typo.MICRO),
                     color = colors.secondaryText,
                 )
