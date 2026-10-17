@@ -89,6 +89,8 @@ class ClinicalConformanceTest {
 
     private fun context(json: JSONObject?) = TriageEngine.Context(
         isPregnant = json?.optBoolean("isPregnant") ?: false,
+        isUnderFive = json?.optBoolean("isUnderFive") ?: false,
+        isOverSixty = json?.optBoolean("isOverSixty") ?: false,
         isUnderFiveOrOverSixty = json?.optBoolean("isUnderFiveOrOverSixty") ?: false,
         hasChronicCondition = json?.optBoolean("hasChronicCondition") ?: false,
         hadDengueBefore = json?.optBoolean("hadDengueBefore") ?: false,
@@ -284,6 +286,36 @@ class ClinicalConformanceTest {
             val context = CarePlanContext.from(vitals, labs, now)
             assertEquals(strings(item.getJSONArray("notableVitals")), context.notableVitals.map { it.slug })
             assertEquals(strings(item.getJSONArray("notableLabs")), context.notableLabs.map { it.slug })
+        }
+    }
+
+    @Test
+    fun recentReadings() {
+        list("recentReadings").forEach { item ->
+            val array = item.getJSONArray("entries")
+            val entries = (0 until array.length()).map { index ->
+                array.getJSONObject(index).let {
+                    VitalsEntry(
+                        dateMillis = it.hoursAgo(),
+                        temperature = it.doubleOrNull("temperature"),
+                        pulse = it.doubleOrNull("pulse"),
+                        systolic = it.doubleOrNull("systolic"),
+                        diastolic = it.doubleOrNull("diastolic"),
+                        oxygenSaturation = it.doubleOrNull("oxygenSaturation"),
+                    )
+                }
+            }
+            val label = array.toString()
+            val actual = WHOCarePlan.recentReadings(entries, now)
+            val expected = item.optJSONObject("readings")
+            if (expected == null) {
+                assertNull(label, actual)
+                return@forEach
+            }
+            val readings = requireNotNull(actual) { label }
+            VitalKind.entries.forEach { kind ->
+                assertEquals("${kind.slug} in $label", expected.doubleOrNull(kind.slug), readings.value(kind))
+            }
         }
     }
 

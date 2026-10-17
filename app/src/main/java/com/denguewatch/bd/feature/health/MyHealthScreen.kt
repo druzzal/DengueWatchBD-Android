@@ -187,9 +187,9 @@ fun MyHealthScreen(
         // reasons.
         entries.firstOrNull()?.let { latest ->
             item {
-                val recentVitals = state.vitals.latest?.takeIf {
-                    System.currentTimeMillis() - it.dateMillis <= CarePlanContext.RECENCY_WINDOW_MILLIS
-                }
+                // Each measure is its own latest reading, so a later entry
+                // that left a measure out does not hide the earlier one.
+                val recentVitals = WHOCarePlan.recentReadings(state.vitals.entries)
                 // Days of fever as of today, not as of the day the check was
                 // run — the illness moves on even when the reader does not
                 // open the app.

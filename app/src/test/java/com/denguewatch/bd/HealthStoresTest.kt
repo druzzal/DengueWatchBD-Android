@@ -163,4 +163,25 @@ class HealthStoresTest {
         assertNull("not asked is not zero days", entry.feverDaysAgo)
         assertEquals(false, entry.isPregnant)
     }
+
+    @Test
+    fun `the two age answers survive a reload`() {
+        val path = file("case-log.json")
+        CaseLogStore(path).add(CaseLogEntry(dateMillis = now, symptomIds = listOf("fever"), isUnderFive = true))
+        val context = CaseLogStore(path).entries.single().triageContext
+        assertTrue(context.isUnderFive)
+        assertEquals(false, context.isOverSixty)
+        assertTrue(context.isHigherRiskGroup)
+    }
+
+    @Test
+    fun `a check saved with the combined age answer stays in the higher-risk group`() {
+        val path = file("case-log.json")
+        path.writeText(
+            """[{"id":"a","date":$now,"symptomIds":["fever"],"outcome":2,"note":"","isUnderFiveOrOverSixty":true}]"""
+        )
+        val context = CaseLogStore(path).entries.single().triageContext
+        assertTrue(context.isHigherRiskGroup)
+        assertEquals(false, context.isUnderFive)
+    }
 }

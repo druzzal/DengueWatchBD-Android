@@ -133,14 +133,15 @@ val SymptomSetSaver: Saver<Set<String>, ArrayList<String>> = Saver(
 /** The risk questions answered so far. The day of fever is saved on its own. */
 val TriageContextSaver: Saver<TriageEngine.Context, BooleanArray> = Saver(
     save = {
-        booleanArrayOf(it.isPregnant, it.isUnderFiveOrOverSixty, it.hasChronicCondition, it.hadDengueBefore)
+        booleanArrayOf(it.isPregnant, it.isUnderFive, it.hasChronicCondition, it.hadDengueBefore, it.isOverSixty)
     },
     restore = {
         TriageEngine.Context(
             isPregnant = it.getOrElse(0) { false },
-            isUnderFiveOrOverSixty = it.getOrElse(1) { false },
+            isUnderFive = it.getOrElse(1) { false },
             hasChronicCondition = it.getOrElse(2) { false },
             hadDengueBefore = it.getOrElse(3) { false },
+            isOverSixty = it.getOrElse(4) { false },
         )
     },
 )

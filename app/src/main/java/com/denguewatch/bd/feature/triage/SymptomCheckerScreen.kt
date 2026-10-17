@@ -399,8 +399,12 @@ private fun RiskStep(
             ToggleRow(loc.t("check.risk.pregnant"), context.isPregnant) {
                 onContextChange(context.copy(isPregnant = it))
             }
-            ToggleRow(loc.t("check.risk.age"), context.isUnderFiveOrOverSixty) {
-                onContextChange(context.copy(isUnderFiveOrOverSixty = it))
+            // One or the other, never both: ticking one clears the other.
+            ToggleRow(loc.t("check.risk.underFive"), context.isUnderFive) {
+                onContextChange(context.copy(isUnderFive = it, isOverSixty = context.isOverSixty && !it))
+            }
+            ToggleRow(loc.t("check.risk.overSixty"), context.isOverSixty) {
+                onContextChange(context.copy(isOverSixty = it, isUnderFive = context.isUnderFive && !it))
             }
             ToggleRow(loc.t("check.risk.chronic"), context.hasChronicCondition) {
                 onContextChange(context.copy(hasChronicCondition = it))

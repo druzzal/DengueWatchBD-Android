@@ -82,10 +82,26 @@ object TriageEngine {
     data class Context(
         val feverDaysAgo: Int? = null,
         val isPregnant: Boolean = false,
+        /**
+         * Asked separately from over 60 because a small child's blood pressure
+         * and pulse are not an adult's, and the care plan reads them
+         * differently.
+         */
+        val isUnderFive: Boolean = false,
+        val isOverSixty: Boolean = false,
+        /**
+         * "Under 5 or over 60", as checks made before the two were asked
+         * separately recorded it. Still a higher-risk group, but which end of
+         * life it meant is unknown, so the readings are judged as an adult's.
+         */
         val isUnderFiveOrOverSixty: Boolean = false,
         val hasChronicCondition: Boolean = false,
         val hadDengueBefore: Boolean = false,
     ) {
+        /** At either extreme of age, however it was recorded. */
+        val isAgeRiskGroup: Boolean
+            get() = isUnderFive || isOverSixty || isUnderFiveOrOverSixty
+
         /**
          * The groups WHO 2025 names when it lists who is admitted: pregnancy
          * outright, and the extremes of age and underlying conditions as
@@ -97,7 +113,7 @@ object TriageEngine {
          * advice on its own.
          */
         val isHigherRiskGroup: Boolean
-            get() = isPregnant || isUnderFiveOrOverSixty || hasChronicCondition
+            get() = isPregnant || isAgeRiskGroup || hasChronicCondition
     }
 
     fun evaluate(selected: Set<String>, context: Context): TriageOutcome {

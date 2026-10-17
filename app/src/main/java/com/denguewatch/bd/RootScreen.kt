@@ -502,7 +502,8 @@ Destination.SymptomCheck -> SymptomCheckerScreen(
                             // tomorrow.
                             feverDaysAgo = feverDaysAgo,
                             isPregnant = triageContext.isPregnant,
-                            isUnderFiveOrOverSixty = triageContext.isUnderFiveOrOverSixty,
+                            isUnderFive = triageContext.isUnderFive,
+                            isOverSixty = triageContext.isOverSixty,
                             hasChronicCondition = triageContext.hasChronicCondition,
                             hadDengueBefore = triageContext.hadDengueBefore,
                         )

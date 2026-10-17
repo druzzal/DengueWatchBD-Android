@@ -180,6 +180,53 @@ data class WHOCarePlan(
         const val LOW_OXYGEN = 94.0
 
         /**
+         * Hypotension in a child under five: below 70 is low at every age from
+         * infancy to five (the paediatric limit is 70 + 2 × age in years),
+         * where 90 would call many healthy toddlers shocked.
+         *
+         * There is no child pulse threshold. A normal pulse under five runs
+         * from about 100 to 160 and more with fever, so no one number serves,
+         * and the age group already sends a child to be seen today. Pulse
+         * pressure and oxygen keep their adult thresholds, which WHO applies
+         * at every age.
+         */
+        const val LOW_SYSTOLIC_UNDER_FIVE = 70.0
+
+        /**
+         * The newest reading of each measure taken within the recency window,
+         * gathered into one set.
+         *
+         * Not simply the newest entry. An entry holds whichever readings were
+         * typed in at the time, so a temperature logged alone half an hour
+         * after a low blood pressure would otherwise hide the blood pressure,
+         * and move the reader into a calmer group on the strength of a number
+         * nobody measured. Each measure is its own most recent reading
+         * instead, so a newer blood pressure still replaces an older one.
+         *
+         * The two blood-pressure numbers are taken together from one entry, the
+         * newest with an upper number, because a pulse pressure worked out from
+         * two different readings describes no moment at all.
+         */
+        fun recentReadings(
+            entries: List<VitalsEntry>,
+            now: Long = System.currentTimeMillis(),
+        ): VitalsEntry? {
+            val recent = entries
+                .filter { now - it.dateMillis <= CarePlanContext.RECENCY_WINDOW_MILLIS }
+                .sortedByDescending { it.dateMillis }
+            val newest = recent.firstOrNull() ?: return null
+            val bloodPressure = recent.firstOrNull { it.systolic != null }
+            return VitalsEntry(
+                dateMillis = newest.dateMillis,
+                temperature = recent.firstNotNullOfOrNull { it.temperature },
+                pulse = recent.firstNotNullOfOrNull { it.pulse },
+                systolic = bloodPressure?.systolic,
+                diastolic = bloodPressure?.diastolic,
+                oxygenSaturation = recent.firstNotNullOfOrNull { it.oxygenSaturation },
+            )
+        }
+
+        /**
          * @param symptoms ids ticked in the symptom check.
          * @param vitals the most recent set of readings, if any are recent
          *   enough to speak to how the reader is now.
@@ -204,11 +251,11 @@ data class WHOCarePlan(
 
             // Measured signs. Order matters: pulse pressure first, because it is
             // the one that changes before the others do.
-            val measured = measuredConcerns(vitals)
+            val measured = measuredConcerns(vitals, isUnderFive = context.isUnderFive)
             reasons += measured
 
             if (context.isPregnant) reasons += Reason.PREGNANCY
-            if (context.isUnderFiveOrOverSixty || context.hasChronicCondition) {
+            if (context.isAgeRiskGroup || context.hasChronicCondition) {
                 reasons += Reason.HIGHER_RISK_GROUP
             }
             if (context.hadDengueBefore) reasons += Reason.PREVIOUS_DENGUE
@@ -243,8 +290,13 @@ data class WHOCarePlan(
          * Null readings are not concerns: a blood pressure never taken is not a
          * normal blood pressure, and a missing number must never quietly move
          * someone into a calmer group.
+         *
+         * A child under five is held to the child's blood-pressure limit and no
+         * pulse limit; see [LOW_SYSTOLIC_UNDER_FIVE]. A check from before the
+         * age question was split keeps the adult limits, since it cannot say
+         * whether it meant a child.
          */
-        private fun measuredConcerns(vitals: VitalsEntry?): List<Reason> {
+        private fun measuredConcerns(vitals: VitalsEntry?, isUnderFive: Boolean): List<Reason> {
             if (vitals == null) return emptyList()
             val found = mutableListOf<Reason>()
 
@@ -255,8 +307,9 @@ data class WHOCarePlan(
             ) {
                 found += Reason.NARROW_PULSE_PRESSURE
             }
-            if (systolic != null && systolic < LOW_SYSTOLIC) found += Reason.LOW_BLOOD_PRESSURE
-            vitals.pulse?.let { if (it > FAST_PULSE) found += Reason.FAST_PULSE }
+            val lowSystolic = if (isUnderFive) LOW_SYSTOLIC_UNDER_FIVE else LOW_SYSTOLIC
+            if (systolic != null && systolic < lowSystolic) found += Reason.LOW_BLOOD_PRESSURE
+            if (!isUnderFive) vitals.pulse?.let { if (it > FAST_PULSE) found += Reason.FAST_PULSE }
             vitals.oxygenSaturation?.let { if (it < LOW_OXYGEN) found += Reason.LOW_OXYGEN }
             return found
         }

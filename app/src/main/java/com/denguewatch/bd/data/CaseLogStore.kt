@@ -39,6 +39,12 @@ data class CaseLogEntry(
      * them.
      */
     val isPregnant: Boolean = false,
+    val isUnderFive: Boolean = false,
+    val isOverSixty: Boolean = false,
+    /**
+     * The single "under 5 or over 60" answer older checks recorded. New checks
+     * write the two flags above and leave this false.
+     */
     val isUnderFiveOrOverSixty: Boolean = false,
     val hasChronicCondition: Boolean = false,
     val hadDengueBefore: Boolean = false,
@@ -59,6 +65,8 @@ data class CaseLogEntry(
         get() = TriageEngine.Context(
             feverDaysAgo = feverDaysAgo,
             isPregnant = isPregnant,
+            isUnderFive = isUnderFive,
+            isOverSixty = isOverSixty,
             isUnderFiveOrOverSixty = isUnderFiveOrOverSixty,
             hasChronicCondition = hasChronicCondition,
             hadDengueBefore = hadDengueBefore,
@@ -88,6 +96,8 @@ data class CaseLogEntry(
         put("note", note)
         feverDaysAgo?.let { put("feverDaysAgo", it) }
         put("isPregnant", isPregnant)
+        put("isUnderFive", isUnderFive)
+        put("isOverSixty", isOverSixty)
         put("isUnderFiveOrOverSixty", isUnderFiveOrOverSixty)
         put("hasChronicCondition", hasChronicCondition)
         put("hadDengueBefore", hadDengueBefore)
@@ -110,6 +120,8 @@ data class CaseLogEntry(
                 json.optInt("feverDaysAgo")
             } else null,
             isPregnant = json.optBoolean("isPregnant", false),
+            isUnderFive = json.optBoolean("isUnderFive", false),
+            isOverSixty = json.optBoolean("isOverSixty", false),
             isUnderFiveOrOverSixty = json.optBoolean("isUnderFiveOrOverSixty", false),
             hasChronicCondition = json.optBoolean("hasChronicCondition", false),
             hadDengueBefore = json.optBoolean("hadDengueBefore", false),
